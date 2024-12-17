@@ -13,9 +13,13 @@ PATH <- paste0(DRIVERINFO, "DBQ=", MDBPATH)
 
 swdb<-odbcDriverConnect(PATH)
 
-eh<-read.csv('updated pedigree.csv', sep=';')
-eh<-filter(eh, is.na(eh$GenMumConfidence))
 
+#wait whats this for??? 
+# eh<-read.csv('updated pedigree.csv', sep=';')
+# eh<-filter(eh, is.na(eh$GenMumConfidence))
+
+
+############################################
 library(tidyverse)
 pedigree<-left_join(pedigree,lifespan, by="BirdID")
 
@@ -140,13 +144,6 @@ write.csv(annualReprosuccess, "ars_90day.csv")
 #i can just add 0 for the individuals with no lifetime reproductive success later
 
 
-#get r from leslie matrix 
-# 
-# lambda<-lastseen%>%
-#   group_by(PeriodYear)%>%
-#   distinct(BirdID, .keep_all = T)%>%
-#   summarise(popsize=n())%>%
-#   mutate(lambda=popsize/lag(popsize))
 
 
 #survival 
@@ -206,6 +203,8 @@ survivalanalysis2<-filter(survivalanalysis, survivalanalysis$BirdID %!in% transl
 
 survivalanalysis2$PeriodEnd<-as.Date(survivalanalysis2$PeriodEnd, '%Y-%m-%d')
 
+
+#remove extra status 
 fps<-readxl::read_excel('fps.xlsx')
 fps$PeriodEnd<-as.Date(fps$PeriodEnd, "%Y-%m-%d")
 fps$PeriodStart<-as.Date(fps$PeriodStart, "%Y-%m-%d")
@@ -215,36 +214,143 @@ fps<-fps%>%
   mutate(season=case_when(seasonlength == max(seasonlength)~"main",
                           seasonlength != max(seasonlength)~"winter"))
 fps<-as.data.frame(fps)
-fps<-filter(fps, fps$season=='main')
-# majorseason<-majorseason[majorseason$FieldPeriodID!=29,]
-# majorseason<-rbind(majorseason, fps[fps$FieldPeriodID==28,])
-# majorseason$PeriodEnd<-as.Date(majorseason$PeriodEnd, '%Y-%m-%d')
-
-test<-survivalanalysis2
-# test$PeriodEnd<-test$PeriodEnd+1
 
 
-#trial no 2
-test2<-merge(survivalanalysis2, fps, by.x = c("FieldPeriodID", 'PeriodYear', 
-                                              "PeriodEnd"), all.x=T)
+#join fp 
+test<-left_join(survivalanalysis2, fps, by=c('FieldPeriodID', 'PeriodYear',"Island"))
 
 
-test<-test%>%
-  dplyr::left_join(fps, by=c("PeriodYear"), suffix = c('','.new'))%>%
-  mutate(FieldPeriodID = ifelse(is.na(FieldPeriodID), FieldPeriodID.new, FieldPeriodID),) %>%
-  select(-c(FieldPeriodID.new,))
+test<-test%>%group_by(BirdID, PeriodYear)%>%mutate(no_st=length(Status))
+
+#if bird has more than one status that year, 
+#take status of the fieldperiod that is summer 
+morethan1<-test|>filter(no_st>1)
+mainst<-morethan1|>filter(season=="main"|Status=='NS')
+
+onest<-test|>filter(no_st==1)
+
+survivaldf<-rbind(mainst, onest)
+
+#should be okay now. duplicated statuses in a year removed 
+
+
+#for each bird, summarize check if theres more than 1 NS 
+
+survivaldf<-survivaldf%>%
+  group_by(BirdID)%>%
+  mutate(nrns=sum(Status=="NS"))
 
 
 #remove the double NS 
+onens <- survivaldf%>%filter(nrns==1)
+
+multiplens<-survivaldf%>%filter(nrns>1)
+multiplens<-as.data.frame(multiplens)
+
+getrid<-data.frame()
+for(i in unique(multiplens$BirdID)){
+  onebirdns<-filter(multiplens, multiplens$BirdID==i& multiplens$Status=='NS')
+  onebirdns<-arrange(onebirdns, onebirdns$PeriodEnd.x)
+  onetormv<-onebirdns[-c(1),]
+  getrid<-rbind(getrid,onetormv)
+}
 
 
-#take major season 
-er<-test%>%
-  group_by(BirdID, PeriodYear)%>%
-  filter(FieldPeriodID==max(FieldPeriodID))
+test<-anti_join(survivaldf, getrid)
 
-mightwork<-er
+survivaldata<-test%>%
+  arrange(BirdID, PeriodYear)
 
+#save data
+write.csv(survivaldata, 'survival_updated.csv')
+
+####################################
+#getting survival probability  
+
+
+latestlifespan<-read.csv('C:/PhD/Data/lifespan_171224.csv',stringsAsFactors = F)
+
+test2<-left_join(survivaldata, latestlifespan, by='BirdID')
+test2<-test2[,-c(20)]
+check<-test2%>%
+  filter(is.na(lifespan))
+
+survivaldata2<-test2%>%filter(!is.na(lifespan))
+
+#remove fledglings 
+survivaldatafinal<-survivaldata2%>%filter(lifespan>90)
+
+
+
+#separate survival into cohorts 
+cohorts<- split(survivaldatafinal, survivaldatafinal$birthyear)
+
+pxfunc<-function(x){
+  x<-as.data.frame(x)
+  onecohort<-data.frame()
+  for(t in unique(x$age)){    # i should not need a counter for this
+    oneage<-filter(x, x$age==t)
+    nextage<-filter(x, x$age==t+1)   #is including age t+1 enough? #there are only 39 birds ringed at age 2 so is negligible. 
+    og<-length(oneage$BirdID)
+    appeared<-length(setdiff(nextage$BirdID, oneage$BirdID)) #keep this 
+    dead<-nrow(filter(nextage, nextage$survival==0 & (nextage$BirdID %in% oneage$BirdID))) #length of those at age 1 that survival 0. #is it enough to just tally the number of 0?  
+    px<-(og+appeared-dead)/(og+appeared)
+    onerow<-data.frame(age=t,px=px)
+    onecohort<-rbind(onecohort,onerow) #but need to remove last age 
+  }
+  return(onecohort)
+}
+
+survprob<-lapply(cohorts, pxfunc)
+
+#Remember 
+
+#dead<-length(setdiff(oneage$BirdID, nextage$BirdID))
+
+#what will happen in the last age??? 
+#next age will be empty, there will be none not dead, none appeared 
+
+#pseudocode 
+# for each cohort, find BirdIDs at age t
+#find same BirdIDs at age t+1 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#get er 
+ars_90<-read.csv('ars_90day.csv')
+ars_90<-arrange(ars_90, ars_90$BirdID, ars_90$chickyear)
+ars_90<-ars_90[,-c(1)]
+
+tblbirdid<-sqlFetch(swdb, 'tblBirdID', stringsAsFactors=F)
+tblbirdid$birthyear<-as.numeric(str_sub(tblbirdid$BirthDate, 1,4))
+tblbirdid<-tblbirdid[,c('BirdID', 'birthyear')]
+ars_90<-left_join(ars_90, tblbirdid, by='BirdID')
+ars_90$age<-ars_90$chickyear-ars_90$birthyear
+#there is still one individual with age -1 
+
+
+#test may work. should have gotten rid of individuals with double ns 
 
 
 hist(survivalanalysis$age)
@@ -266,6 +372,18 @@ hist(physio$BodyMass)
 
 #is r the same? 
 #no its nr births minus nr deaths 
+
+
+#get age specific survival 
+#separate by cohort (birth year)
+#get no of deaths per age 
+
+
+
+
+
+
+
 
 
 
