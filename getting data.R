@@ -14,6 +14,7 @@ PATH <- paste0(DRIVERINFO, "DBQ=", MDBPATH)
 swdb<-odbcDriverConnect(PATH)
 
 
+
 #wait whats this for??? 
 # eh<-read.csv('updated pedigree.csv', sep=';')
 # eh<-filter(eh, is.na(eh$GenMumConfidence))
@@ -22,6 +23,12 @@ swdb<-odbcDriverConnect(PATH)
 ############################################
 library(tidyverse)
 pedigree<-left_join(pedigree,lifespan, by="BirdID")
+
+sex<-readxl::read_excel('sys_SexEstimates.xlsx')
+discard<-c(199,530,984,1230,1397,1508,1580,1619,1620,1675,1705,1806,3456,
+           3531,3550,3616,3622,3629,3654,3662,3673,3674,3679,3681,3687,5256)
+sex<-filter(sex, sex$BirdID %!in% discard)
+sex<-sex[,c(1,2)]
 
 pedigree<-filter(pedigree, pedigree$GenDadConfidence>=80 & pedigree$GenMumConfidence>=80)
 
@@ -40,6 +47,10 @@ filteredped$chickyear<-as.numeric(str_sub(filteredped$BirthDate, 7))
 
 filteredped2$chickyear<-as.numeric(str_sub(filteredped2$BirthDate, 7)) #a year
 
+
+#i should not have to run ARS code for males/ genetic fathers but will keep for now. 
+
+#that did nothing lmaooooooo i need to optimize my code but whatever keep it for now. 
 dams<-list()
 for(i in filteredped$BirdID){
   dam<-data.frame()
@@ -48,6 +59,8 @@ for(i in filteredped$BirdID){
 }
 
 dams<-do.call(rbind.data.frame, dams)
+dams<-left_join(dams,sex, by='BirdID')
+
 
 #for a year
 dams2<-list()
@@ -57,6 +70,7 @@ for(i in filteredped2$BirdID){
   dams2[[i]]<-dam2
 }
 dams2<-do.call(rbind.data.frame, dams2)
+dams2<-left_join(dams2,sex,by='BirdID')
 
 #fathers 
 sires<-list()
@@ -69,7 +83,7 @@ for(i in filteredped$BirdID){
 
 sires<-do.call(rbind.data.frame, sires)
 sires$chickyear<-str_sub(sires$BirthDate, 7,10)
-
+sires<-left_join(sires,sex,by='BirdID')
 
 #one year ped
 sires2<-list()
@@ -81,8 +95,15 @@ for(i in filteredped2$BirdID){
 
 sires2<-do.call(rbind.data.frame, sires2)
 sires2$chickyear<-str_sub(sires2$BirthDate, 7,10)
+sires2<-left_join(sires2, sex, by='BirdID')
 
 ###########
+#make sure you are only counting female offspring !!!!!!!!!!!!
+
+
+dams<-filter(dams, dams$SexEstimate==0)
+dams2<-filter(dams2, dams2$SexEstimate==0)
+
 
 #90 days 
 dars<-data.frame()
@@ -97,7 +118,7 @@ names(dars)[names(dars) == 'BirdID'] <- 'ChickBirdID'
 names(dars)[names(dars) == 'GeneticMother'] <- 'BirdID'
 dars<-dars[,c("NestID","BirdID","chickyear","ars")]
 
-
+dars<-unique(dars)
 
 #one year dams################
 dars2<-data.frame()
@@ -114,6 +135,9 @@ dars2<-dars2[,c("NestID","BirdID","chickyear","ars")]
 dars2<-unique(dars2)
 
 #####################
+
+#i think i shouldnt have to do this 
+
 #90 days sire
 sars<-data.frame()
 sars<-sires%>%
@@ -254,7 +278,7 @@ Malears$sex<-1
 annualReprosuccess<-rbind(Female_rs, Malears)
 
 write.csv(annualReprosuccess, "ars_90day.csv")
-
+write.csv(Female_rs, 'femalers90day.csv')
 # one year ----------------------------
 Female_rs2<-rbind(idd2,dars2)
 Malears2<-rbind(ids2,sars2)
@@ -264,6 +288,7 @@ Malears2$sex<-1
 annualReprosuccess2<-rbind(Female_rs2, Malears2)
 
 write.csv(annualReprosuccess2, "ars_365.csv")
+write.csv(Female_rs2, 'femalers_365.csv')
 
 
  
@@ -317,8 +342,7 @@ for(i in unique(survivalanalysis$BirdID)){
 }
  
 
-sex<-read.csv('sys_SexEstimates.csv', sep=';')
-sex<-sex[,c(1,2)]
+
 survivalanalysis<-left_join(survivalanalysis,sex, by="BirdID")
 
 #remove translocated bidrs 
@@ -404,9 +428,11 @@ write.csv(survivaldata, 'survival_updated.csv')
 
 
 latestlifespan<-read.csv('C:/PhD/Data/lifespan_171224.csv',stringsAsFactors = F)
+latestlifespan<-latestlifespan[,-c(1)]
 survivaldata<-read.csv('survival_updated.csv')
+survivaldata<-survivaldata[,-c(1)]
 test2<-left_join(survivaldata, latestlifespan, by='BirdID')
-test2<-test2[,-c(20)]
+# test2<-test2[,-c(20)]  #what the fuck was this?? 
 check<-test2%>%
   filter(is.na(lifespan))
 
@@ -420,13 +446,13 @@ survivaldatafinal<-survivaldata2%>%filter(lifespan>90)
 #separate survival into cohorts 
 cohorts<- split(survivaldatafinal, survivaldatafinal$birthyear)
 # 
-# x<-as.data.frame(cohorts[[15]])
+# x<-as.data.frame(cohorts[['2012']])
 # t<-0
 pxfunc<-function(x){
   x<-as.data.frame(x)
   onecohort<-data.frame()
   for(t in unique(x$age)){    # i should not need a counter for this
-    oneage<-filter(x, x$age==t & survival==1)  #birds alive at age t #should work? 
+    oneage<-filter(x, x$age==t & x$survival==1)  #birds alive at age t #should work? 
     nextage<-filter(x, x$age==t+1)   #is including age t+1 enough? #there are only 39 birds ringed at age 2 so is negligible. 
     og<-length(oneage$BirdID)
     appeared<-length(setdiff(nextage$BirdID, oneage$BirdID)) #keep this 
@@ -440,6 +466,8 @@ pxfunc<-function(x){
 }
 
 survprob<-lapply(cohorts, pxfunc)
+#checking cohort 12 calcs from age 6-11 is correct. 
+
 
 #for survival need to remove cohorts before 1992 and after 2020 due to lack of corresponding reproductive success data 
 #also need to remove last row for last age from all dataframes before making leslie matrix. 
@@ -466,6 +494,16 @@ ars_90<-unique(ars_90)
 #there is still one individual with age -1 
 
 
+#female 90 days
+
+female90rs<-read.csv('femalers90day.csv')
+female90rs<-female90rs[,-c(1)]
+
+female90rs<-arrange(female90rs, female90rs$BirdID, female90rs$chickyear)
+
+female90rs<-left_join(female90rs, tblbirdid, by='BirdID')
+female90rs$age<-female90rs$chickyear-female90rs$birthyear
+female90rs<-unique(female90rs)
 
 ################# one year --------
 ars_365<-read.csv('ars_365.csv')
@@ -477,6 +515,17 @@ ars_365$age<-ars_365$chickyear-ars_365$birthyear
 ars_365<-unique(ars_365)
 
 
+#female 365 days
+
+female365rs<-read.csv('femalers_365.csv')
+female365rs<-female365rs[,-c(1)]
+
+female365rs<-arrange(female365rs, female365rs$BirdID, female365rs$chickyear)
+
+female365rs<-left_join(female365rs, tblbirdid, by='BirdID')
+female365rs$age<-female365rs$chickyear-female365rs$birthyear
+female365rs<-unique(female365rs)
+female365rs$sex<-0
 
 #separate into cohorts 
 fertilitycohorts<-split(ars_90, ars_90$birthyear)
@@ -484,15 +533,24 @@ fertilitycohorts<-split(ars_90, ars_90$birthyear)
 fertcohort2<-split(ars_365, ars_365$birthyear)
 
 
+
+##female offspring only 
+fxco<-split(female90rs, female90rs$birthyear)
+fxco2<-split(female365rs, female365rs$birthyear)
+
+
+
 # x<-fertcohort2[['2011']]
 # t<-2
 
 #function to get age specific fertility 
+#Oh fuck its female offsprin only.. 
+
 mxfunc<-function(x){
   x<-as.data.frame(x)
   onecohort<-data.frame()
   for(t in unique(x$age)){    #for each age in a cohort,   
-    oneage<-filter(x, x$age==t & sex==0)  #filter: one dataset for each age of each cohort 
+    oneage<-filter(x, x$age==t & x$sex==0)  #filter: one dataset for each age of each cohort 
     mx<-mean(oneage$ars)*0.5     #find the expected ars, 0.5 because female offspring of females only, but also fitness is halved
     #unknowns: mx should be half female female offspring? or half all offspring? or complete female offspring
     onerow<-data.frame(age=t,mx=mx)
@@ -505,10 +563,64 @@ mxfunc<-function(x){
 fx<-lapply(fertilitycohorts, mxfunc)  #90 day ars 
 fx2<-lapply(fertcohort2, mxfunc)  # one year ars 
 
+realfx<-lapply(fxco,mxfunc)
+realfx2<-lapply(fxco2,mxfunc)
 
 ###########################################
 
+#code for finding px and mx for the whole population over all time 
 
+survivaldata_all<-filter(survivaldatafinal, survivaldatafinal$birthyear>=1992)
+
+#px (survival probabilty)
+px_all<-data.frame()
+for(t in unique(survivaldata_all$age)){   
+    oneage<-filter(survivaldata_all, survivaldata_all$age==t & survivaldata_all$survival==1)  #birds alive at age t  
+    nextage<-filter(survivaldata_all, survivaldata_all$age==t+1)   
+    og<-length(oneage$BirdID)
+    appeared<-length(setdiff(nextage$BirdID, oneage$BirdID)) #keep this 
+    dead<-nrow(filter(nextage, nextage$survival==0 & (nextage$BirdID %in% oneage$BirdID))) #length of those at age 1 that survival 0. #is it enough to just tally the number of 0?  
+    px<-(og+appeared-dead)/(og+appeared)
+    onerow<-data.frame(age=t,px=px)
+    px_all<-rbind(px_all,onerow) #but need to remove last age 
+  }
+px_all<-px_all[-c(21,22),]
+
+
+#mx (fecundity)
+female90rs
+female365rs
+
+fxall_90<-data.frame()
+
+for(t in unique(female90rs$age)){    #for each age in a cohort,   
+    oneage<-filter(female90rs, female90rs$age==t)  #filter: one dataset for each age of each cohort 
+    mx<-mean(oneage$ars)*0.5     #find the expected ars, 0.5 because female offspring of females only, but also fitness is halved
+    #unknowns: mx should be half female female offspring? or half all offspring? or complete female offspring
+    onerow<-data.frame(age=t,mx=mx)
+    fxall_90<-rbind(fxall_90,onerow) #but need to remove last age 
+  }
+
+
+fxall_365<-data.frame()
+
+for(t in unique(female365rs$age)){    #for each age in a cohort,   
+    oneage<-filter(female365rs, female365rs$age==t)  #filter: one dataset for each age of each cohort 
+    mx<-mean(oneage$ars)*0.5     #find the expected ars, 0.5 because female offspring of females only, but also fitness is halved
+    #unknowns: mx should be half female female offspring? or half all offspring? or complete female offspring
+    onerow<-data.frame(age=t,mx=mx)
+    fxall_365<-rbind(fxall_365,onerow) #but need to remove last age 
+  }
+
+
+
+
+
+
+
+
+
+####################
 
 
 hist(survivalanalysis$age)
