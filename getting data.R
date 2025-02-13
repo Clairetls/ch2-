@@ -777,18 +777,6 @@ names(pxfx_cohorts)<-names(survprob)
 # merge(x,y, by='age')
 
 
-
-#estimate srb -------
-males<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==1)
-females<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==0)
-#m to f at age 1 is 0.962 (female biased?)
-#at age 0 is 0.952  (so basically 1 to 1)
-
-# 
-# install.packages("demogR")
-# library(demogR)
-
-
 #px is NOT CUMULATIVE 
 
 
@@ -850,12 +838,34 @@ saveRDS(all_bycohort, 'pxmxnx_bycohort.rds')
 write.csv(pxfxnx_alltime, 'pxfxnx_all.csv')
 
 
+#estimate sr -------
+males<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==1)
+females<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==0)
+#m to f at age 1 is 0.962 (female biased?)
+#at age 0 is 0.952  (so basically 1 to 1)
+
+
+
 #####################################################
 #make leslie matrix 
 
+library(mpmtools)
+
+colnames(pxfxnx_alltime)<-c('x','sx','mx','nx')  
+#sx for survival, mx for fecundity, x for age, nx for popn size
+
+bla<-make_Leslie_matrix(pxfxnx_alltime)
+
+lambda1(bla)
+0.9127974  #for the whole population 
 
 
+test<-all_bycohort[[10]]
+colnames(test)<-c('x','sx','mx','nx')
 
+test_2001<-make_Leslie_matrix(test)
+#v14 should not have a 1 at the v bottom??
+lambda1(test_2001)
 
 ############################
 #just for fun
