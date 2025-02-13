@@ -22,6 +22,7 @@ swdb<-odbcDriverConnect(PATH)
 
 ############################################
 library(tidyverse)
+library(data.table)
 pedigree<-left_join(pedigree,lifespan, by="BirdID")
 
 sex<-readxl::read_excel('sys_SexEstimates.xlsx')
@@ -384,7 +385,12 @@ test<-test%>%group_by(BirdID, PeriodYear)%>%mutate(no_st=length(Status))
 #if bird has more than one status that year, 
 #take status of the fieldperiod that is summer 
 morethan1<-test|>filter(no_st>1)
-mainst<-morethan1|>filter(season=="main"|Status=='NS')
+
+mainst<-morethan1|>
+  group_by(BirdID, PeriodYear)|>
+  arrange(desc(Status == "NS"), desc(season == "main")) %>% # Prioritize NS, then main season
+  slice(1)
+#if there is main, take main, if no main take one randomly or ns
 
 onest<-test|>filter(no_st==1)
 
@@ -395,10 +401,12 @@ survivaldf<-rbind(mainst, onest)
 
 #for each bird, summarize check if theres more than 1 NS 
 
+n_distinct(survivaldf$BirdID)  #3611 birds
+sum(survivaldf$Status=='NS')   #3699 NS statuses
+
 survivaldf<-survivaldf%>%
   group_by(BirdID)%>%
   mutate(nrns=sum(Status=="NS"))
-
 
 #remove the double NS 
 onens <- survivaldf%>%filter(nrns==1)
@@ -441,23 +449,131 @@ survivaldata2<-test2%>%filter(!is.na(lifespan))
 #remove fledglings 
 survivaldatafinal<-survivaldata2%>%filter(lifespan>90)
 
+survivaldata_all<-filter(survivaldatafinal, survivaldatafinal$birthyear>=1992)
+survivaldata_all<-filter(survivaldata_all, survivaldata_all$age>=0)   #there was age -1
 
+# test<-survivaldata_all%>%
+#   group_by(BirdID, age)%>%
+#   summarize(count=length(survival))
+#bird 823 and bird 1268 at ages 9 and 5 rsp have more than 1 status. 
+#no need now- fixed the filtering before this 
+
+
+#looking at age when bird first ringed 
+test<-survivaldata_all%>%
+  group_by(BirdID)%>%
+  summarise(minage=min(age))
+
+not0<-filter(test,test$minage>0)
+not0<-unique(not0$BirdID)
+
+#bird ID 4847 caught age 3, 3022 and 3495 caught age 2 
+#4847 was migrated from CE, 3022 is normal, 3495 is ur 
+#remove 4847 and 3495
+
+survivaldata_all<-filter(survivaldata_all, survivaldata_all$BirdID %!in% c(4847,3495))
+
+
+addto<-subset(survivaldata_all, survivaldata_all$BirdID %in% not0)
+
+#add rows for individuals not entering df at age 0
+
+
+# test2<-test2%>%
+#   group_by(BirdID)%>%
+#   complete(PeriodYear=full_seq(unique(birthyear):max(PeriodYear),1),
+#            fill=list(survival=1, age=0, birthyear=unique(birthyear)))
+
+
+# complete df 
+#for each unique bird id, 
+#if birth year is before min(periodyear)
+#add a row for each year the bird was not observed between birth year and min(periodyear)
+
+
+#remove age and survival
+addto_zero <- addto %>% distinct(BirdID,.keep_all = T) %>% 
+  dplyr::select(-age, -survival) %>% 
+  mutate(age = 0, survival = 1, PeriodYear=birthyear)
+
+#cuz its all 0 now max(age) is ok
+addto_zero %>% summarise(minage = max(age), meansurv = mean(survival))
+
+addto_one <- addto %>% 
+  arrange(age) %>% 
+  distinct(BirdID,.keep_all = T) %>%   #remove dups i think 
+  filter(age>1) %>% 
+  dplyr::select(-age, -survival) %>% 
+  mutate(age = 1, survival = 1, PeriodYear=birthyear+1)
+
+survivaldata_all_zero <- rbind(survivaldata_all,addto_zero) %>% rbind(.,addto_one )
+survivaldata_all_zero<-survivaldata_all_zero%>%arrange(BirdID,age)
+
+
+n_distinct(survivaldata_all_zero$BirdID)
+survivaldata_all_zero %>% filter(age==0) %>% {n_distinct(.$BirdID)}
+
+#check again
+test2<-survivaldata_all_zero%>%
+  group_by(BirdID)%>%
+  summarise(minage=min(age))
+
+#chuen checking if the birds have the right number of rows by checking if n() = lifespan per bird
+survdatarows <- survivaldata_all_zero %>% 
+  group_by(BirdID) %>%
+  mutate(numberofrows = n()) %>%
+  arrange(desc(age)) %>%
+  distinct(BirdID,.keep_all = T) %>%
+  mutate(conflict = case_when((numberofrows-1) == age ~ "goodgood", TRUE ~ "notgood")) %>%
+  filter(conflict %in% "notgood") # four birds with missing values,let's fix them
+# manually check all four bird IDs: 470 missing age 7, 561 missing age 6, 599 missing 6, 640 also missing 6
+
+#470 also has period year 1993 twice, age 0 and 1 
+
+
+
+finalsurvival<-survivaldata_all_zero
+
+
+
+#.SD means to subset , selfsame or self reference the data 
 
 #separate survival into cohorts 
-cohorts<- split(survivaldatafinal, survivaldatafinal$birthyear)
-# 
+cohorts<- split(finalsurvival, finalsurvival$birthyear)
+# x<-cohorts[['2005']]
 # x<-as.data.frame(cohorts[['2012']])
-# t<-0
+# t<-1
+# & (nextage$BirdID %in% oneage$BirdID)
+
+#issues caused by :
+#either first appeared was already 0 
+#caught at age 2 not seen at age 0 and 1 
+#everything past age 2 is fine 
+
+# troubleshooting 
+# dead1<-filter(nextage, nextage$survival==0 & (nextage$BirdID %in% oneage$BirdID)) #49
+# dead2<-filter(nextage, nextage$survival==0)#57
+# #in 2014 there are 8 birds in age t+1 died not in age t 
+# 
+# length(unique(dead1$BirdID))
+# setdiff(dead2$BirdID, dead1$BirdID)
+# 
+# dead3<-filter(nextage, nextage$survival==0 & (nextage$BirdID %in% oneage$BirdID)) #5
+# dead4<-filter(nextage, nextage$survival==0) #5 
+
+#maybe need to add any potential birds that are dead 
+
 pxfunc<-function(x){
   x<-as.data.frame(x)
   onecohort<-data.frame()
   for(t in unique(x$age)){    # i should not need a counter for this
     oneage<-filter(x, x$age==t & x$survival==1)  #birds alive at age t #should work? 
-    nextage<-filter(x, x$age==t+1)   #is including age t+1 enough? #there are only 39 birds ringed at age 2 so is negligible. 
-    og<-length(oneage$BirdID)
-    appeared<-length(setdiff(nextage$BirdID, oneage$BirdID)) #keep this 
-    dead<-nrow(filter(nextage, nextage$survival==0 & (nextage$BirdID %in% oneage$BirdID))) #length of those at age 1 that survival 0. #is it enough to just tally the number of 0?  
-    px<-(og+appeared-dead)/(og+appeared)
+    nextage<-filter(x, x$age==(t+1))   
+    og<-length(unique(oneage$BirdID))
+  # appeared<-length(setdiff(nextage$BirdID, oneage$BirdID)) #dont need this after fixing 
+    dead<-nrow(filter(nextage, nextage$survival==0)) #length of those at age 1 that survival 0. #is it enough to just tally the number of 0?  
+    px<-(og-dead)/(og)
+    #add appeared 2
     onerow<-data.frame(age=t,px=px)
     onecohort<-rbind(onecohort,onerow) #but need to remove last age 
   }
@@ -467,6 +583,11 @@ pxfunc<-function(x){
 
 survprob<-lapply(cohorts, pxfunc)
 #checking cohort 12 calcs from age 6-11 is correct. 
+
+# check 2003
+finalsurvival %>% filter(birthyear %in% "2003") %>%
+  group_by(age,survival) %>% summarise(n=n())
+
 
 
 #for survival need to remove cohorts before 1992 and after 2020 due to lack of corresponding reproductive success data 
@@ -569,25 +690,29 @@ realfx2<-lapply(fxco2,mxfunc)
 
 #code for finding px and mx for the whole population over all time 
 
-survivaldata_all<-filter(survivaldatafinal, survivaldatafinal$birthyear>=1992)
+
 
 #px (survival probabilty)
 px_all<-data.frame()
-for(t in unique(survivaldata_all$age)){   
-    oneage<-filter(survivaldata_all, survivaldata_all$age==t & survivaldata_all$survival==1)  #birds alive at age t  
-    nextage<-filter(survivaldata_all, survivaldata_all$age==t+1)   
-    og<-length(oneage$BirdID)
-    appeared<-length(setdiff(nextage$BirdID, oneage$BirdID)) #keep this 
-    dead<-nrow(filter(nextage, nextage$survival==0 & (nextage$BirdID %in% oneage$BirdID))) #length of those at age 1 that survival 0. #is it enough to just tally the number of 0?  
-    px<-(og+appeared-dead)/(og+appeared)
+for(t in unique(finalsurvival$age)){   
+    oneage<-filter(finalsurvival, finalsurvival$age==t & finalsurvival$survival==1)  #birds alive at age t  
+    nextage<-filter(finalsurvival, finalsurvival$age==t+1)   
+    og<-length(unique(oneage$BirdID))
+    # appeared<-length(setdiff(nextage$BirdID, oneage$BirdID))
+    dead<-nrow(filter(nextage, nextage$survival==0)) #length of those at age 1 that survival 0. #is it enough to just tally the number of 0?  
+    px<-(og-dead)/(og)
     onerow<-data.frame(age=t,px=px)
     px_all<-rbind(px_all,onerow) #but need to remove last age 
   }
-px_all<-px_all[-c(21,22),]
+px_all<-px_all[-c(21),]
+
+
+#age0dead<-filter(survivaldata_all, survivaldata_all$age==0, survival==0)
+#there are 0 dead at age 0. 
 
 
 #mx (fecundity) --------------------------
-female365rs
+# use female365rs
 
 # fxall_90<-data.frame()
 # 
@@ -604,8 +729,8 @@ fxall_365<-data.frame()
 
 for(t in unique(female365rs$age)){    #for each age in a cohort,   
     oneage<-filter(female365rs, female365rs$age==t)  #filter: one dataset for each age of each cohort 
-    mx<-mean(oneage$ars)*0.5     #find the expected ars, 0.5 because offspring of females only, but also fitness is halved
-    #unknowns: mx should be half female female offspring? or half all offspring? or complete female offspring
+    mx<-mean(oneage$ars)*0.5     #find the expected ars, 0.5 * all offspring of females only, but also fitness is halved
+    #mx should be half all offspring? or complete female offspring
     onerow<-data.frame(age=t,mx=mx)
     fxall_365<-rbind(fxall_365,onerow) #but need to remove last age 
   }
@@ -622,40 +747,90 @@ for(t in unique(female365rs$age)){    #for each age in a cohort,
 pxfx_365<-merge(px_all, fxall_365, by='age')
 
 
-ggplot(pxfx_365, aes(x=age,y=mx))+geom_point() #sub mx for px for other graph 
+ggplot(pxfx_365, aes(x=age,y=px))+geom_point() #sub mx for px for other graph 
 
 
 #for different cohorts 
 survprob
 #remove cohorts 1972-1991
-pxcohorts<-survprob[c(19:47)]
+# pxcohorts<-survprob[c(19:47)]
 realfx2
 
-function(x,y){merge(x[[i]],y[[j]], by='age')}
+# function(x,y){merge(x[[i]],y[[j]], by='age')}
 
 pxfx_cohorts<-lapply(names(pxcohorts), 
                      function(x){merge(pxcohorts[[x]], realfx2[[x]], by='age')} )
 
 names(pxfx_cohorts)<-names(pxcohorts)
 
-merge(x,y, by='age')
+# merge(x,y, by='age')
 
 
 #estimate srb -------
 males<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==1)
 females<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==0)
-#m to f at age 1 is 0.962
+#m to f at age 1 is 0.962 (female biased?)
 #at age 0 is 0.952  (so basically 1 to 1)
 
+# 
+# install.packages("demogR")
+# library(demogR)
 
-install.packages("demogR")
-library(demogR)
+
+#px is NOT CUMULATIVE 
 
 
-leslie.matrix(pxfx_365$px, pxfx_365$mx,  #lx (survival) and mx (fertility)
-              SRB=1,           #sex ratio at birth set to 1,
-              infant.class=F)  #inflant class means shorter width than other classes
 
+#get n for populations -------------------
+
+
+n_all<-data.frame()
+for(t in unique(finalsurvival$age)){   
+  oneage<-filter(finalsurvival, finalsurvival$age==t & finalsurvival$survival==1)  #birds alive at age t  
+  og<-length(oneage$BirdID)
+  onerow<-data.frame(age=t,nx=og)
+  n_all<-rbind(n_all,onerow) #but need to remove last age 
+}
+
+# check if the two methods (n_all and px_all) matches up
+n_all_div <- n_all %>% 
+  mutate(diff = lead(nx)/nx) %>% 
+  merge(.,px_all,by="age",all=T) %>%
+  mutate(conflict = case_when(diff == px ~ "goodgood", TRUE ~ "notgood"))
+#yay i fixed it 
+#qqboo
+
+#population for the cohorts now 
+
+nfunc<-function(x){
+  x<-as.data.frame(x)
+  n_cohort<-data.frame()
+  for(t in unique(x$age)){   
+    oneage<-filter(x, x$age==t & x$survival==1)  #birds alive at age t  
+    og<-length(unique(oneage$BirdID))
+    onerow<-data.frame(age=t,nx=og)
+    n_cohort<-rbind(n_cohort,onerow) #but need to remove last age 
+  }
+  return(n_cohort)
+}
+
+#-dead
+
+nbycohort<-lapply(cohorts, nfunc)
+
+
+#what is happening in 2023 - years a bit funny 
+
+
+
+#all n except age 0 is correct 
+#what is the issue? 
+#where did it come from. 
+#is the px wrong 
+#n is also wrong or not? 
+
+
+hist(survivaldata_all$birthyear, breaks = 30)
 
 ####################
 
