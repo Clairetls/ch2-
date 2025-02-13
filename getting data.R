@@ -534,6 +534,13 @@ survdatarows <- survivaldata_all_zero %>%
 
 finalsurvival<-survivaldata_all_zero
 
+write.csv(finalsurvival,'cleansurvivaldata.csv')
+
+###############################
+#leslie matrix stuff 
+
+finalsurvival<-read.csv('cleansurvivaldata.csv')
+finalsurvival<-finalsurvival[,-c(1)]
 
 
 #.SD means to subset , selfsame or self reference the data 
@@ -601,17 +608,17 @@ finalsurvival %>% filter(birthyear %in% "2003") %>%
 #age specific fertility 
 
 
-#get er 
-ars_90<-read.csv('ars_90day.csv')
-ars_90<-arrange(ars_90, ars_90$BirdID, ars_90$chickyear)
-ars_90<-ars_90[,-c(1)]
+# #get er 
+# ars_90<-read.csv('ars_90day.csv')
+# ars_90<-arrange(ars_90, ars_90$BirdID, ars_90$chickyear)
+# ars_90<-ars_90[,-c(1)]
 
 tblbirdid<-sqlFetch(swdb, 'tblBirdID', stringsAsFactors=F)
 tblbirdid$birthyear<-as.numeric(str_sub(tblbirdid$BirthDate, 1,4))
 tblbirdid<-tblbirdid[,c('BirdID', 'birthyear')]
-ars_90<-left_join(ars_90, tblbirdid, by='BirdID')
-ars_90$age<-ars_90$chickyear-ars_90$birthyear
-ars_90<-unique(ars_90)
+# ars_90<-left_join(ars_90, tblbirdid, by='BirdID')
+# ars_90$age<-ars_90$chickyear-ars_90$birthyear
+# ars_90<-unique(ars_90)
 #there is still one individual with age -1 
 
 
@@ -635,8 +642,13 @@ ars_365<-left_join(ars_365, tblbirdid, by='BirdID')
 ars_365$age<-ars_365$chickyear-ars_365$birthyear
 ars_365<-unique(ars_365)
 
+############################################################
+
+#use this!!!!!!!!!!!!!!!
+
 
 #female 365 days
+
 
 female365rs<-read.csv('femalers_365.csv')
 female365rs<-female365rs[,-c(1)]
@@ -681,7 +693,7 @@ mxfunc<-function(x){
 
 
 # fx<-lapply(fertilitycohorts, mxfunc)  #90 day ars 
-fx2<-lapply(fertcohort2, mxfunc)  # one year ars 
+# fx2<-lapply(fertcohort2, mxfunc)  # one year ars 
 
 # realfx<-lapply(fxco,mxfunc)
 realfx2<-lapply(fxco2,mxfunc)
@@ -751,19 +763,19 @@ ggplot(pxfx_365, aes(x=age,y=px))+geom_point() #sub mx for px for other graph
 
 
 #for different cohorts 
-survprob
 #remove cohorts 1972-1991
-# pxcohorts<-survprob[c(19:47)]
+survprob<-survprob[c(1:29)]
 realfx2
 
 # function(x,y){merge(x[[i]],y[[j]], by='age')}
 
-pxfx_cohorts<-lapply(names(pxcohorts), 
-                     function(x){merge(pxcohorts[[x]], realfx2[[x]], by='age')} )
+pxfx_cohorts<-lapply(names(survprob), 
+                     function(x){merge(survprob[[x]], realfx2[[x]], by='age')} )
 
-names(pxfx_cohorts)<-names(pxcohorts)
+names(pxfx_cohorts)<-names(survprob)
 
 # merge(x,y, by='age')
+
 
 
 #estimate srb -------
@@ -819,18 +831,44 @@ nfunc<-function(x){
 nbycohort<-lapply(cohorts, nfunc)
 
 
-#what is happening in 2023 - years a bit funny 
+nbycohort<-nbycohort[c(1:29)]
+
+#list of all cohorts with px, mx and nx 
+all_bycohort<-lapply(names(pxfx_cohorts), 
+                     function(x){merge(pxfx_cohorts[[x]],nbycohort[[x]], by='age')})
+
+names(all_bycohort)<-names(pxfx_cohorts)
 
 
 
-#all n except age 0 is correct 
-#what is the issue? 
-#where did it come from. 
-#is the px wrong 
-#n is also wrong or not? 
+#population size and px and fx for all time 
+pxfxnx_alltime<-merge(pxfx_365, n_all, by='age')
+
+#save objects 
+saveRDS(all_bycohort, 'pxmxnx_bycohort.rds')
+
+write.csv(pxfxnx_alltime, 'pxfxnx_all.csv')
 
 
-hist(survivaldata_all$birthyear, breaks = 30)
+#####################################################
+#make leslie matrix 
+
+
+
+
+
+############################
+#just for fun
+
+library(ggplot2)
+blah<-do.call(rbind, pxfx_cohorts)
+blah$cohort<-as.numeric(str_sub(rownames(blah),1,4))
+blah<-filter(blah, blah$age<5)
+blah$age<-as.factor(blah$age)
+
+ggplot(blah, aes(x=blah$cohort, y=blah$px,colour = blah$age))+geom_point()+geom_smooth(method='lm')
+  ylim(0,1)
+
 
 ####################
 
