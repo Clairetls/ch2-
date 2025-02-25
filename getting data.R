@@ -837,35 +837,142 @@ saveRDS(all_bycohort, 'pxmxnx_bycohort.rds')
 
 write.csv(pxfxnx_alltime, 'pxfxnx_all.csv')
 
+#fx should be mx because fx=sxmx
 
-#estimate sr -------
+#estimate asr -------
 males<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==1)
 females<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==0)
 #m to f at age 1 is 0.962 (female biased?)
-#at age 0 is 0.952  (so basically 1 to 1)
+#at age 0 is 0.952  
 
 
 
 #####################################################
 #make leslie matrix 
-
+library(demogR)
 library(mpmtools)
 
 colnames(pxfxnx_alltime)<-c('x','sx','mx','nx')  
 #sx for survival, mx for fecundity, x for age, nx for popn size
 
-bla<-make_Leslie_matrix(pxfxnx_alltime)
+# bla<-make_Leslie_matrix(pxfxnx_alltime, model='post')
+#this gives me weird values 
 
-lambda1(bla)
+
+leslie_all<-matrix(0,20,20)
+
+leslie_all[1,]<-pxfxnx_alltime$mx
+for (i in 2:20) {
+  leslie_all[i, i-1] <- pxfxnx_alltime$sx[i-1]
+}
+
+
+
+lambda_all<-lambda1(leslie_all)  
+#0.9279268
+
+
+#so technically you dont need the population size to calculate the dominant eigenvalue
 0.9127974  #for the whole population 
 
 
-test<-all_bycohort[[10]]
-colnames(test)<-c('x','sx','mx','nx')
+#so no i dont want n(t+1)/n(t) (should give the same value though)
 
-test_2001<-make_Leslie_matrix(test)
-#v14 should not have a 1 at the v bottom??
-lambda1(test_2001)
+#doing it per cohort 
+
+x<-'2011'
+
+lesliefunc<-function(data){
+  n<-nrow(data)
+  leslie<-matrix(0,n,n)
+  leslie[1,]<-data$mx
+  for (i in 2:nrow(data)) {
+    leslie[i, i-1] <- data$px[i-1]
+  }
+  return(leslie)
+}
+
+leslie_percohort<-lapply(all_bycohort, lesliefunc)
+
+
+lambdapercohort<-sapply(leslie_percohort, lambda1)
+
+lambda_df<-data.frame(year=names(lambdapercohort),lambda=lambdapercohort)
+
+
+#looking at this there seems to be too much stochasticity. 
+
+#testing for stable age distribution 
+
+leslie_all*('vector of n') - 0.9279268 *('vector of n')== as.vector(rep(0,20))
+
+test<-as.matrix(leslie_all)
+
+test<-as.matrix(leslie_all)-0.9279268
+
+
+######################################################################################
+
+#survival shadow 
+selection<-(csurv*e^(-lambda_all*age))/px
+
+e<-exp(1)
+r<-log(lambda_all)
+
+#y is 1
+
+survshadow<-pxfxnx_alltime%>%
+  mutate(cumsurv=cumprod(sx), 
+         ly=lead(cumsurv),
+         cumsurvery=ly*e^(-r*(x+1))) %>%
+  arrange(desc(x)) %>%
+  filter(!(x%in%"19")) %>%
+  mutate(selection=cumsum(cumsurvery)/sx)%>%
+  arrange(x)
+
+survplot<-ggplot(survshadow, aes(x, selection))+geom_point()+
+  geom_line()+ylab('Hamiltonian Strength of Selection')+xlab("Age")+theme_classic()
+
+
+survplot
+
+
+
+
+
+
+survshadow<-data.frame()
+for(i in 1:nrow(pxfxnx_alltime)){
+  # x<-seq(1:i+1)
+  age<-(i-1)
+  lx<-cumprod(pxfxnx_alltime$sx[1:i])
+  lx<-lx[-c(1)]
+  lx<-lx*e^(-lambda_all*age)
+  upper<-cumsum(that)
+  beta<-upper/pxfxnx_alltime$sx[i]
+  onerow<-c(age,beta)
+  survshadow<-rbind(survshadow, onerow)
+}
+
+
+#######################
+
+#fertility survival 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ############################
 #just for fun
@@ -876,7 +983,7 @@ blah$cohort<-as.numeric(str_sub(rownames(blah),1,4))
 blah<-filter(blah, blah$age<5)
 blah$age<-as.factor(blah$age)
 
-ggplot(blah, aes(x=blah$cohort, y=blah$px,colour = blah$age))+geom_point()+geom_smooth(method='lm')
+ggplot(blah, aes(x=blah$cohort, y=blah$mx,colour = blah$age))+geom_point()+geom_smooth(method='lm')
   ylim(0,1)
 
 
@@ -909,13 +1016,46 @@ hist(physio$BodyMass)
 #get no of deaths per age 
 
 
+#################################
+#leslie matrix from 1997 to 2013 
+surv97_13<-filter(finalsurvival, finalsurvival$birthyear>1996 & finalsurvival$birthyear<2014)
+px_9713<-data.frame()
+for(t in unique(surv97_13$age)){   
+  oneage<-filter(surv97_13, surv97_13$age==t & surv97_13$survival==1)  #birds alive at age t  
+  nextage<-filter(surv97_13, surv97_13$age==t+1)   
+  og<-length(unique(oneage$BirdID))
+  # appeared<-length(setdiff(nextage$BirdID, oneage$BirdID))
+  dead<-nrow(filter(nextage, nextage$survival==0)) #length of those at age 1 that survival 0. #is it enough to just tally the number of 0?  
+  px<-(og-dead)/(og)
+  onerow<-data.frame(age=t,px=px)
+  px_9713<-rbind(px_9713,onerow) #but need to remove last age 
+}
+px_9713<-px_9713[-c(20),]
 
 
+rs_9713<-filter(female365rs, female365rs$birthyear>1996, female365rs$birthyear<2014)
+
+fx_9713<-data.frame()
+
+for(t in unique(rs_9713$age)){    #for each age in a cohort,   
+  oneage<-filter(rs_9713, rs_9713$age==t)  #filter: one dataset for each age of each cohort 
+  mx<-mean(oneage$ars)*0.5     #find the expected ars, 0.5 * all offspring of females only, but also fitness is halved
+  #mx should be half all offspring? or complete female offspring
+  onerow<-data.frame(age=t,mx=mx)
+  fx_9713<-rbind(fx_9713,onerow) #but need to remove last age 
+}
 
 
+leslie_9713<-matrix(0,18,18)
 
+leslie_9713[1,]<-fx_9713$mx[1:18]
+for (i in 2:18) {
+  leslie_9713[i, i-1] <- px_9713$px[i-1]
+}
 
+lambda1(leslie_9713)
 
+0.9497799 
 
 #how many times has one bird come up in the Genetic mothers and Genetic fathers 
 # dams<-filteredped%>%
