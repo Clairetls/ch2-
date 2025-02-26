@@ -839,12 +839,12 @@ write.csv(pxfxnx_alltime, 'pxfxnx_all.csv')
 
 #fx should be mx because fx=sxmx
 
-#estimate asr -------
-males<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==1)
-females<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==0)
-#m to f at age 1 is 0.962 (female biased?)
-#at age 0 is 0.952  
-
+# estimate asr -------
+# males<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==1)
+# females<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$SexEstimate==0)
+# m to f at age 1 is 0.962 (female biased?)
+# at age 0 is 0.952  
+# 
 
 
 #####################################################
@@ -852,7 +852,12 @@ females<-filter(survivaldatafinal, survivaldatafinal$age==0 &survivaldatafinal$S
 library(demogR)
 library(mpmtools)
 
-colnames(pxfxnx_alltime)<-c('x','sx','mx','nx')  
+all_bycohort<-read_rds('pxmxnx_bycohort.rds')
+
+pxfxnx_alltime<-read.csv('pxfxnx_all.csv')
+pxfxnx_alltime<-pxfxnx_alltime[,-c(1)]
+
+# colnames(pxfxnx_alltime)<-c('x','sx','mx','nx')  
 #sx for survival, mx for fecundity, x for age, nx for popn size
 
 # bla<-make_Leslie_matrix(pxfxnx_alltime, model='post')
@@ -863,7 +868,7 @@ leslie_all<-matrix(0,20,20)
 
 leslie_all[1,]<-pxfxnx_alltime$mx
 for (i in 2:20) {
-  leslie_all[i, i-1] <- pxfxnx_alltime$sx[i-1]
+  leslie_all[i, i-1] <- pxfxnx_alltime$px[i-1]
 }
 
 
@@ -909,6 +914,31 @@ leslie_all*('vector of n') - 0.9279268 *('vector of n')== as.vector(rep(0,20))
 test<-as.matrix(leslie_all)
 
 test<-as.matrix(leslie_all)-0.9279268
+
+
+
+eigen<-data.frame(coeff=c(pxfxnx_alltime$px), n=c(0:19))
+eigen<-eigen[-nrow(eigen),]
+
+# eigen$n<-paste('n', eigen$n)
+eigen$coeff_L<-eigen$coeff/lambda_all
+
+eigen$coeff_new<-paste(eigen$coeff_L,'n', eigen$n)
+eigen$n<-as.numeric(c(1:19))
+eigen$lead<-cumprod(eigen$coeff_L)
+
+
+eigen$mx<-pxfxnx_alltime$mx[2:20]
+
+eigen$equa<-eigen$lead*eigen$mx
+# eigen$n<-as.numeric(c(1:19))
+eigen<-rbind(eigen,data.frame(coeff=-0.9250696433, n=0, coeff_L=NA,coeff_new='n0',lead=1,mx=NA,equa=-0.9250696433))
+eigen<-eigen%>%
+  arrange(n)
+
+eigen$n<-paste('n',eigen$n)
+
+eigen$sad<-eigen$lead*2099
 
 
 ######################################################################################
