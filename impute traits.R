@@ -15,6 +15,8 @@ missingdf<-physio[,c('newlifespan','age_year','BodyMass',
 
 # install.packages('psych')
 library(psych)
+library(Amelia)
+library(mice)
 
 #maybe i should add the rows that are bird alive but not caught 
 missingness<-ifelse(is.na(missingdf)==TRUE, 0,1)

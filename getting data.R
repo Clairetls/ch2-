@@ -874,18 +874,18 @@ for (i in 2:20) {
 
 
 lambda_all<-lambda1(leslie_all)  
-#0.9279268
+0.9279268
 
 
 #so technically you dont need the population size to calculate the dominant eigenvalue
-0.9127974  #for the whole population 
 
 
 #so no i dont want n(t+1)/n(t) (should give the same value though)
 
+#################################################################################
 #doing it per cohort 
 
-x<-'2011'
+
 
 lesliefunc<-function(data){
   n<-nrow(data)
@@ -905,16 +905,12 @@ lambdapercohort<-sapply(leslie_percohort, lambda1)
 lambda_df<-data.frame(year=names(lambdapercohort),lambda=lambdapercohort)
 
 
+ggplot(lambda_df, aes(x=year, y=lambda))+geom_point()+geom_line()
+
+
 #looking at this there seems to be too much stochasticity. 
 
 #testing for stable age distribution 
-
-leslie_all*('vector of n') - 0.9279268 *('vector of n')== as.vector(rep(0,20))
-
-test<-as.matrix(leslie_all)
-
-test<-as.matrix(leslie_all)-0.9279268
-
 
 
 eigen<-data.frame(coeff=c(pxfxnx_alltime$px), n=c(0:19))
@@ -939,6 +935,8 @@ eigen<-eigen%>%
 eigen$n<-paste('n',eigen$n)
 
 eigen$sad<-eigen$lead*2099
+
+#depends on if i did it correctly, I don't think the population meets stable age distribution.. 
 
 
 ######################################################################################
@@ -990,15 +988,28 @@ for(i in 1:nrow(pxfxnx_alltime)){
 #fertility survival 
 
 
+view(pxfxnx_alltime)
 
 
+fert<-pxfxnx_alltime
+fert$lx<-cumprod(pxfxnx_alltime$px)
+
+#ravindran 
+fert$selection<-fert$lx*e^(-r*fert$age)
+fert$selection2<-(fert$lx*fert$mx)*e^(-r*fert$age)
+
+#hamilton vs baudisch method 
+
+fert$upper<-fert$lx*e^(-r*fert$age)
+fert$prelower<-fert$age*fert$upper*fert$mx 
+
+fert$lower<-
 
 
+#plotting 
+fert<-pivot_longer(fert,cols = 6:7, names_to = 'selection')
 
-
-
-
-
+ggplot(fert, aes(x=age, y=value, colour = selection))+geom_point()+geom_line()
 
 
 
