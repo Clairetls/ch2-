@@ -8,7 +8,7 @@ library(RODBC)
 DRIVERINFO <- "Driver={Microsoft Access Driver (*.mdb, *.accdb)};"
 
 #change to path of your database 
-MDBPATH <- "C:/Users/P309444/Downloads/database day 191124/SeychellesWarbler1.11.1.accdb"
+MDBPATH <- "C:/database day 191124/SeychellesWarbler1.11.1.accdb"
 PATH <- paste0(DRIVERINFO, "DBQ=", MDBPATH)
 
 swdb<-odbcDriverConnect(PATH)
@@ -24,6 +24,7 @@ swdb<-odbcDriverConnect(PATH)
 library(tidyverse)
 library(data.table)
 pedigree<-left_join(pedigree,lifespan, by="BirdID")
+pedigree<-filter(pedigree, pedigree$GenDadConfidence>=80 & pedigree$GenMumConfidence>=80)
 
 sex<-readxl::read_excel('sys_SexEstimates.xlsx')
 discard<-c(199,530,984,1230,1397,1508,1580,1619,1620,1675,1705,1806,3456,
@@ -31,41 +32,30 @@ discard<-c(199,530,984,1230,1397,1508,1580,1619,1620,1675,1705,1806,3456,
 sex<-filter(sex, sex$BirdID %!in% discard)
 sex<-sex[,c(1,2)]
 
-pedigree<-filter(pedigree, pedigree$GenDadConfidence>=80 & pedigree$GenMumConfidence>=80)
 
 #subset pedigree to exclude individuals older than 90 days 
-test<-filter(pedigree, pedigree$newlifespan>90|is.na(pedigree$newlifespan))
+# test<-filter(pedigree, pedigree$newlifespan>90|is.na(pedigree$newlifespan))
 #filter for 90 
 
 test2<-filter(pedigree, pedigree$newlifespan>364|is.na(pedigree$newlifespan))
 #filter for a year survival as per otto and day
 
 #NAs<-filter(test, is.na(test$newlifespan))  check NAs 
-filteredped<-test
+# filteredped<-test
 filteredped2<-test2  #a year
 
-filteredped$chickyear<-as.numeric(str_sub(filteredped$BirthDate, 7))
+# filteredped$chickyear<-as.numeric(str_sub(filteredped$BirthDate, 7))
 
 filteredped2$chickyear<-as.numeric(str_sub(filteredped2$BirthDate, 7)) #a year
 
 
 #i should not have to run ARS code for males/ genetic fathers but will keep for now. 
 
-#that did nothing lmaooooooo i need to optimize my code but whatever keep it for now. 
-# dams<-list()
-# for(i in filteredped$BirdID){
-#   dam<-data.frame()
-#   dam<-filter(filteredped, filteredped$GeneticMother==i)
-#   dams[[i]]<-dam
-# }
-# 
-# dams<-do.call(rbind.data.frame, dams)
-# dams<-left_join(dams,sex, by='BirdID')
 
 #use this 
 #for a year
 dams2<-list()
-for(i in filteredped2$BirdID){
+for(i in unique(filteredped2$BirdID)){
   dam2<-data.frame()
   dam2<-filter(filteredped2, filteredped2$GeneticMother==i)
   dams2[[i]]<-dam2
@@ -73,19 +63,31 @@ for(i in filteredped2$BirdID){
 dams2<-do.call(rbind.data.frame, dams2)
 dams2<-left_join(dams2,sex,by='BirdID')
 
+#dont know why this one removes some bird IDs 
+#i think its because i is gen mom not in BirdID 
+
+
+dams2new<-filteredped2%>%
+  group_by(GeneticMother, chickyear)%>%
+  summarise(ars=length(BirdID))
+
+colnames(dams2new)[colnames(dams2new)=='GeneticMother']<-'BirdID'
+dams2new<-left_join(dams2new, sex, by='BirdID')
+
+
 #fathers 
 #no need 
-sires<-list()
-for(i in filteredped$BirdID){
-  sire<-data.frame()
-  sire<-filter(filteredped, filteredped$GeneticFather==i)
-  sires[[i]]<-sire
-}
-
-
-sires<-do.call(rbind.data.frame, sires)
-sires$chickyear<-str_sub(sires$BirthDate, 7,10)
-sires<-left_join(sires,sex,by='BirdID')
+# sires<-list()
+# for(i in filteredped$BirdID){
+#   sire<-data.frame()
+#   sire<-filter(filteredped, filteredped$GeneticFather==i)
+#   sires[[i]]<-sire
+# }
+# 
+# 
+# sires<-do.call(rbind.data.frame, sires)
+# sires$chickyear<-str_sub(sires$BirthDate, 7,10)
+# sires<-left_join(sires,sex,by='BirdID')
 
 #one year ped
 sires2<-list()
@@ -99,27 +101,21 @@ sires2<-do.call(rbind.data.frame, sires2)
 sires2$chickyear<-str_sub(sires2$BirthDate, 7,10)
 sires2<-left_join(sires2, sex, by='BirdID')
 
+#######################################################
+sires2new<-filteredped2%>%
+  group_by(GeneticFather, chickyear)%>%
+  summarise(ars=length(BirdID))
+
+colnames(sires2new)[colnames(sires2new)=='GeneticFather']<-'BirdID'
+sires2new<-left_join(sires2new, sex, by='BirdID')
+
+
+
+
+
 ###########
 
 
-# dams<-filter(dams, dams$SexEstimate==0)
-# dams2<-filter(dams2, dams2$SexEstimate==0)
-
-
-#90 days  #NO NEED 
-# dars<-data.frame()
-# dars<-dams%>%
-#   group_by(GeneticMother, chickyear)%>%
-#   mutate(ars=length(chickyear))  #originally this row is summarize to make new df
-# 
-
-# 
-# dars<-as.data.frame(dars)
-# names(dars)[names(dars) == 'BirdID'] <- 'ChickBirdID'
-# names(dars)[names(dars) == 'GeneticMother'] <- 'BirdID'
-# dars<-dars[,c("NestID","BirdID","chickyear","ars")]
-# 
-# dars<-unique(dars)
 
 #one year dams################
 dars2<-data.frame()
@@ -137,21 +133,7 @@ dars2<-unique(dars2)
 
 #####################
 
-#i think i shouldnt have to do this 
 
-#90 days sire
-# sars<-data.frame()
-# sars<-sires%>%
-#   group_by(GeneticFather, chickyear)%>%
-#   mutate(ars=length(chickyear))  #originally this row is summarize to make new df
-# 
-# 
-# 
-# sars<-as.data.frame(sars)
-# names(sars)[names(sars) == 'BirdID'] <- 'ChickBirdID'
-# names(sars)[names(sars) == 'GeneticFather'] <- 'BirdID'
-# sars<-sars[,c("BirdID","chickyear","ars","NestID")]
-# 
 # 
 # #one year sire --------------
 # sars2<-data.frame()
@@ -193,16 +175,17 @@ dars2<-unique(dars2)
 
 
 #one year --------------------------------
-d2<-subset(lastseen, lastseen$BirdID %in% dars2$BirdID) #gets genetic mom
+d2<-subset(lastseen, lastseen$BirdID %in% dams2new$BirdID) #gets genetic mom
 d2<-d2[,c("BirdID","PeriodYear")]
 d2$chickyear<-d2$PeriodYear
 d2<-unique(d2)
 
+unique(dams2new$BirdID)
 idd2<-data.frame()
 #i<-444
 for(i in unique(d2$BirdID)){
   bird2<-filter(d2, d2$BirdID==i)
-  birds2<-filter(dars2, dars2$BirdID==i)
+  birds2<-dams2new%>% filter(BirdID==i)
   no2<-subset(bird2, bird2$chickyear %!in% birds2$chickyear)
   no2<-unique(no2)
   idd2<-rbind(no2,idd2)
@@ -213,10 +196,10 @@ idd2$ars<-0
 # names(idd)[names(idd) == 'FieldPeriodID'] <- 'BirthFieldPeriodID'
 
 idd2<-idd2%>%
-  mutate(NestID=NA)
+  mutate(SexEstimate=0)
 idd2<-idd2[,-c(2)]
 
-
+# 4 borbs have chicks the only years they were alive so idd is 4 less than d2 and dams2new
 
 #dad turn---------------------------------
 # s<-subset(lastseen, lastseen$BirdID %in% sars$BirdID) #gets genetic dad
@@ -243,49 +226,54 @@ idd2<-idd2[,-c(2)]
 # ids<-ids[,-c(2)]
 # 
 # ######### one year -------------------------
-# s2<-subset(lastseen, lastseen$BirdID %in% sars2$BirdID) #gets genetic dad
-# s2<-s2[,c("BirdID","PeriodYear")]
-# s2$chickyear<-s2$PeriodYear
-# s2<-unique(s2)
-# 
-# sars2<-as.data.frame(sars2)
-# 
-# ids2<-data.frame()
-# for(i in unique(s2$BirdID)){
-#   bird2<-filter(s2, s2$BirdID %in% i)
-#   birds2<-filter(sars2, sars2$BirdID %in% i)
-#   no2<-subset(bird2, bird2$chickyear %!in% birds2$chickyear)
-#   no2<-unique(no2)
-#   ids2<-rbind(no2,ids2)
-# }
-# ids2$ars<-0
-# # names(ids)[names(ids) == 'PeriodYear'] <- 'chickyear'
-# # ids<-ids[,-c(2)]
-# 
-# ids2<-ids2%>%
-#   mutate(NestID=NA,)
-# ids2<-ids2[,-c(2)]
+s2<-subset(lastseen, lastseen$BirdID %in% sires2new$BirdID) #gets genetic dad
+s2<-s2[,c("BirdID","PeriodYear")]
+s2$chickyear<-s2$PeriodYear
+s2<-unique(s2)
 
+sires2new<-as.data.frame(sires2new)
+
+ids2<-data.frame()
+for(i in unique(s2$BirdID)){
+  bird2<-filter(s2, s2$BirdID %in% i)
+  birds2<-filter(sires2new, sires2new$BirdID %in% i)
+  no2<-subset(bird2, bird2$chickyear %!in% birds2$chickyear)
+  no2<-unique(no2)
+  ids2<-rbind(no2,ids2)
+}
+ids2$ars<-0
+# names(ids)[names(ids) == 'PeriodYear'] <- 'chickyear'
+# ids<-ids[,-c(2)]
+
+ids2<-ids2%>%
+  mutate(SexEstimate=1)
+ids2<-ids2[,-c(2)]
+
+
+setdiff(sires2new$BirdID, ids2$BirdID)
+
+#same situation as idd2
 
 ###########
 #rbind yes offspring and no offspring 
-Female_rs<-rbind(idd,dars)
-Malears<-rbind(ids,sars)
+# Female_rs<-rbind(idd,dars)
+# Malears<-rbind(ids,sars)
+# 
+# Female_rs$sex<-0
+# Malears$sex<-1
+# annualReprosuccess<-rbind(Female_rs, Malears)
+# 
+# write.csv(annualReprosuccess, "ars_90day.csv")
+# write.csv(Female_rs, 'femalers90day.csv')
 
-Female_rs$sex<-0
-Malears$sex<-1
-annualReprosuccess<-rbind(Female_rs, Malears)
-
-write.csv(annualReprosuccess, "ars_90day.csv")
-write.csv(Female_rs, 'femalers90day.csv')
 # one year ----------------------------
-Female_rs2<-rbind(idd2,dars2)
-Malears2<-rbind(ids2,sars2)
+Female_rs2<-rbind(idd2,dams2new)
+Malears2<-rbind(ids2,sires2new)
 
-Female_rs2$sex<-0
+# Female_rs2$sex<-0
 
 Female_rs2<-arrange(Female_rs2, Female_rs2$BirdID, Female_rs2$chickyear)
-Malears2$sex<-1
+# Malears2$sex<-1
 annualReprosuccess2<-rbind(Female_rs2, Malears2)
 
 write.csv(annualReprosuccess2, "ars_365.csv")
@@ -623,15 +611,15 @@ tblbirdid<-tblbirdid[,c('BirdID', 'birthyear')]
 
 
 #female 90 days
-
-female90rs<-read.csv('femalers90day.csv')
-female90rs<-female90rs[,-c(1)]
-
-female90rs<-arrange(female90rs, female90rs$BirdID, female90rs$chickyear)
-
-female90rs<-left_join(female90rs, tblbirdid, by='BirdID')
-female90rs$age<-female90rs$chickyear-female90rs$birthyear
-female90rs<-unique(female90rs)
+# 
+# female90rs<-read.csv('femalers90day.csv')
+# female90rs<-female90rs[,-c(1)]
+# 
+# female90rs<-arrange(female90rs, female90rs$BirdID, female90rs$chickyear)
+# 
+# female90rs<-left_join(female90rs, tblbirdid, by='BirdID')
+# female90rs$age<-female90rs$chickyear-female90rs$birthyear
+# female90rs<-unique(female90rs)
 
 ################# one year --------
 ars_365<-read.csv('ars_365.csv')
@@ -658,7 +646,6 @@ female365rs<-female365rs[,-c(1)]
 female365rs<-left_join(female365rs, tblbirdid, by='BirdID')
 female365rs$age<-female365rs$chickyear-female365rs$birthyear
 female365rs<-unique(female365rs)
-female365rs$sex<-0
 
 #separate into cohorts 
 # fertilitycohorts<-split(ars_90, ars_90$birthyear)
@@ -874,7 +861,8 @@ for (i in 2:20) {
 
 
 lambda_all<-lambda1(leslie_all)  
-0.9279268
+# 0.9279268
+0.9223668
 
 
 #so technically you dont need the population size to calculate the dominant eigenvalue
@@ -942,23 +930,25 @@ eigen$sad<-eigen$lead*2099
 ######################################################################################
 
 #survival shadow 
-selection<-(csurv*e^(-lambda_all*age))/px
+# selection<-(csurv*e^(-lambda_all*age))/px
 
 e<-exp(1)
 r<-log(lambda_all)
 
 #y is 1
 
+pxfxnx_alltime<-as.data.frame(pxfxnx_alltime)
+
 survshadow<-pxfxnx_alltime%>%
-  mutate(cumsurv=cumprod(sx), 
+  mutate(cumsurv=cumprod(px), 
          ly=lead(cumsurv),
          cumsurvery=ly*e^(-r*(x+1))) %>%
-  arrange(desc(x)) %>%
-  filter(!(x%in%"19")) %>%
-  mutate(selection=cumsum(cumsurvery)/sx)%>%
-  arrange(x)
+  arrange(desc(age)) %>%
+  filter(!(age %in%"19")) %>%
+  mutate(selection=cumsum(cumsurvery)/px)%>%
+  arrange(age)
 
-survplot<-ggplot(survshadow, aes(x, selection))+geom_point()+
+survplot<-ggplot(survshadow, aes(age, selection))+geom_point()+
   geom_line()+ylab('Hamiltonian Strength of Selection')+xlab("Age")+theme_classic()
 
 
@@ -996,6 +986,8 @@ fert$lx<-cumprod(pxfxnx_alltime$px)
 
 #ravindran 
 fert$selection<-fert$lx*e^(-r*fert$age)
+
+#from baudisch
 fert$selection2<-(fert$lx*fert$mx)*e^(-r*fert$age)
 
 #hamilton vs baudisch method 
@@ -1009,7 +1001,7 @@ fert$lower<-
 #plotting 
 fert<-pivot_longer(fert,cols = 6:7, names_to = 'selection')
 
-ggplot(fert, aes(x=age, y=value, colour = selection))+geom_point()+geom_line()
+ggplot(fert, aes(x=age, y=value, colour=selection))+geom_point()+geom_line()
 
 
 
@@ -1096,7 +1088,8 @@ for (i in 2:18) {
 
 lambda1(leslie_9713)
 
-0.9497799 
+# 0.9497799 
+0.9469736
 
 #how many times has one bird come up in the Genetic mothers and Genetic fathers 
 # dams<-filteredped%>%
