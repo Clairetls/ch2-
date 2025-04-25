@@ -1091,23 +1091,175 @@ lambda1(leslie_9713)
 # 0.9497799 
 0.9469736
 
-#how many times has one bird come up in the Genetic mothers and Genetic fathers 
-# dams<-filteredped%>%
-#   group_by(GeneticMother)%>%
-#   summarise(lifetimeRS=length(GeneticMother))%>%
-#   mutate(sex=0)
-# 
-# sires<-filteredped%>%
-#   group_by(GeneticFather)%>%
-#   summarise(lifetimeRS=length(GeneticFather))%>%
-#   mutate(sex=1)
-# 
-# mom<-dams$GeneticMother
-# dad<-sires$GeneticFather
-# 
-# breeders<-c(mom,dad)
+######################################################################################
 
 
-#i dont think i can do the above because of formula 
+# sex specific leslie matrix analysis 
 
+
+#split ars 
+ars_fem<-ars%>%filter(SexEstimate==0)
+ars_male<-ars%>%filter(SexEstimate==1)
+
+
+#split survival 
+
+surv_fem<-filter(finalsurvival, finalsurvival$SexEstimate==0)
+  
+surv_male<-filter(finalsurvival, finalsurvival$SexEstimate==1)
+
+
+#female 
+
+fem_df<-pxfunc(surv_fem)  #px
+
+
+#mx
+
+fx_fem<-data.frame()
+
+for(t in unique(ars_fem$age)){    #for each age in a cohort,   
+  oneage<-filter(ars_fem, ars_fem$age==t)  #filter: one dataset for each age of each cohort 
+  mx<-mean(oneage$ars)*0.5     #find the expected ars, 0.5 * all offspring of females only, but also fitness is halved
+  #mx should be half all offspring? or complete female offspring
+  onerow<-data.frame(age=t,mx=mx)
+  fx_fem<-rbind(fx_fem,onerow) #but need to remove last age 
+}
+
+fem_pxmx<-merge(fem_df, fx_fem, by='age')
+
+#leslie 19x19
+
+fem_leslie<-matrix(0,20,20)
+
+fem_leslie[1,]<-fem_pxmx$mx
+for (i in 2:20) {
+  fem_leslie[i, i-1] <- fem_pxmx$px[i-1]
+}
+
+lambda_fem<-lambda1(fem_leslie)
+0.9458425
+
+#
+e<-exp(1)
+rf<-log(lambda_fem)
+
+fem_pxmx<-as.data.frame(fem_pxmx)
+
+survshadow_fem<-fem_pxmx%>%
+  mutate(cumsurv=cumprod(px), 
+         ly=lead(cumsurv),
+         cumsurvery=ly*e^(-rf*(age+1))) %>%
+  arrange(desc(age)) %>%
+  filter(!(age %in%"19")) %>%
+  mutate(selection=cumsum(cumsurvery)/px)%>%
+  arrange(age)
+
+
+
+#####################################################
+
+
+
+
+#male 
+
+male_df<-pxfunc(surv_male)
+
+
+fx_male<-data.frame()
+
+for(t in unique(ars_male$age)){    #for each age in a cohort,   
+  oneage<-filter(ars_male, ars_male$age==t)  #filter: one dataset for each age of each cohort 
+  mx<-mean(oneage$ars)*0.5     #find the expected ars, 0.5 * all offspring of females only, but also fitness is halved
+  #mx should be half all offspring? or complete female offspring
+  onerow<-data.frame(age=t,mx=mx)
+  fx_male<-rbind(fx_male,onerow) #but need to remove last age 
+}
+
+male_pxmx<-merge(male_df, fx_male, by='age')
+
+#leslie 19x19
+
+male_leslie<-matrix(0,19,19)
+
+male_leslie[1,]<-male_pxmx$mx
+for (i in 2:19) {
+  male_leslie[i, i-1] <- male_pxmx$px[i-1]
+}
+
+
+lambda1(male_leslie)
+rm<-0.9439132
+
+#population growth is similar between the two 
+#but makes sense 
+
+
+
+survshadow_male<-male_pxmx%>%
+  mutate(cumsurv=cumprod(px), 
+         ly=lead(cumsurv),
+         cumsurvery=ly*e^(-rm*(age+1))) %>%
+  arrange(desc(age)) %>%
+  filter(!(age %in%"18")) %>%
+  mutate(selection=cumsum(cumsurvery)/px)%>%
+  arrange(age)
+
+
+
+#combine survival 
+survshadow_male$sex<-1
+survshadow_fem$sex<-0
+
+surv_femmale<-rbind(survshadow_fem, survshadow_male)
+
+surv_femmale$sex<-as.factor(surv_femmale$sex)
+
+femmaleplot<-ggplot(surv_femmale, aes(age, selection, col=sex))+geom_point()+
+  geom_line()+ylab('Hamiltonian Strength of Selection')+xlab("Age")+theme_classic()
+
+
+femmaleplot
+
+
+#################################################################
+
+#fertility 
+
+
+
+#female 
+
+fert_fem<-fem_pxmx
+
+fert_fem$lx<-cumprod(fem_pxmx$px)
+
+
+#from baudisch
+fert_fem$selection<-(fert_fem$lx*fert_fem$mx)*e^(-rf*fert_fem$age)
+
+
+#male 
+fert_male<-male_pxmx
+
+fert_male$lx<-cumprod(fert_male$px)
+
+
+#from baudisch
+fert_male$selection<-(fert_male$lx*fert_male$mx)*e^(-rm*fert_male$age)
+
+
+
+# combine selection on fertility 
+fert_fem$sex<-'Female'
+fert_male$sex<-'Male'
+
+mx_femmale<-rbind(fert_fem,fert_male)
+
+ggplot(mx_femmale, aes(x=age, y=selection, colour=sex))+geom_point()+geom_line()
+
+
+px_separate<-ggplot(mx_femmale, aes(x=age, y=px, colour=sex))+geom_point()+geom_line()
+mx_separate<-ggplot(mx_femmale, aes(x=age, y=mx, colour=sex))+geom_point()+geom_line()
 
