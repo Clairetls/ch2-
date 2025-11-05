@@ -746,7 +746,8 @@ for(t in unique(female365rs$age)){    #for each age in a cohort,
 pxfx_365<-merge(px_all, fxall_365, by='age')
 
 
-ggplot(pxfx_365, aes(x=age,y=px))+geom_point() #sub mx for px for other graph 
+ggplot(pxfx_365, aes(x=age,y=px))+geom_point()+ylab("survival") #sub mx for px for other graph 
+ggplot(pxfx_365, aes(x=age,y=mx))+geom_point()+ylab('fecundity') #sub mx for px for other graph 
 
 
 #for different cohorts 
@@ -995,13 +996,14 @@ fert$selection2<-(fert$lx*fert$mx)*e^(-r*fert$age)
 fert$upper<-fert$lx*e^(-r*fert$age)
 fert$prelower<-fert$age*fert$upper*fert$mx 
 
-fert$lower<-
+# fert$lower<-
 
 
 #plotting 
 fert<-pivot_longer(fert,cols = 6:7, names_to = 'selection')
 
-ggplot(fert, aes(x=age, y=value, colour=selection))+geom_point()+geom_line()
+ggplot(fert, aes(x=age, y=selection))+geom_point()+geom_line()+
+  ylab("Selection on Fertility")+xlab('Age')+theme_cowplot()
 
 
 
@@ -1190,7 +1192,7 @@ for (i in 2:19) {
 
 
 lambda1(male_leslie)
-rm<-0.9439132
+rm<-log(0.9439132)
 
 #population growth is similar between the two 
 #but makes sense 
@@ -1237,7 +1239,7 @@ fert_fem$lx<-cumprod(fem_pxmx$px)
 
 
 #from baudisch
-fert_fem$selection<-(fert_fem$lx*fert_fem$mx)*e^(-rf*fert_fem$age)
+fert_fem$selection<-(fert_fem$lx)*e^(-rf*fert_fem$age)
 
 
 #male 
@@ -1247,7 +1249,7 @@ fert_male$lx<-cumprod(fert_male$px)
 
 
 #from baudisch
-fert_male$selection<-(fert_male$lx*fert_male$mx)*e^(-rm*fert_male$age)
+fert_male$selection<-(fert_male$lx)*e^(-rm*fert_male$age)
 
 
 
@@ -1257,9 +1259,11 @@ fert_male$sex<-'Male'
 
 mx_femmale<-rbind(fert_fem,fert_male)
 
-ggplot(mx_femmale, aes(x=age, y=selection, colour=sex))+geom_point()+geom_line()
+ggplot(mx_femmale, aes(x=age, y=selection, colour=sex))+geom_point()+geom_line()+
+  ylab('Selection on fecundity')+xlab('Age')+theme_cowplot()
 
 
 px_separate<-ggplot(mx_femmale, aes(x=age, y=px, colour=sex))+geom_point()+geom_line()
 mx_separate<-ggplot(mx_femmale, aes(x=age, y=mx, colour=sex))+geom_point()+geom_line()
-
+mx_separate
+px_separate

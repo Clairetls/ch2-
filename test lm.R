@@ -1,4 +1,4 @@
-#impute data for traits 
+#testing whether linear model works 
 
 library(RODBC)
 DRIVERINFO <- "Driver={Microsoft Access Driver (*.mdb, *.accdb)};"
@@ -59,7 +59,7 @@ hist(bodymass$age_year)
 hist(bodymass$lifespan)
 
 
-bodymass$bodymass_z<-scale(bodymass$BodyMass)
+# bodymass$bodymass_z<-scale(bodymass$BodyMass)
 bm<-left_join(bodymass, ars, by=c('BirdID', 'occasionyear'))
 bm$age_year[bm$age_year>=14]<-14
 
@@ -91,6 +91,8 @@ for(i in unique(relativefit$BirdID)){
 
 colnames(lifetime_w)<-c("BirdID",'w1','half_w')
 
+
+write.csv(lifetime_w, "lifetimefitness.csv")
 
 
 #merge relative fitness data with body mass dataframe 
