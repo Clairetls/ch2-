@@ -9,7 +9,7 @@ haem <- read_csv("haematocrit_28_5.csv")
 provi <- read.csv("provisioning_28_5.csv", sep=";")
 
 # select columns for each trait - body mass is in a different script 
-bodymass
+# bodymass
 telo1 <- telomere_28_5[,c('BirdID','RTL','Whodunnit', 'birthyear',
                           'occasionyear','age_year',"Status",
                           'newlifespan','TQ','SexEstimate','newstat',
@@ -27,7 +27,7 @@ provi1 <- provi[,c('BirdID','birthyear','occasionyear','age','newlifespan',
 fatscore <- physio[,c('BirdID','FatScore','Observer','birthyear',
                            'occasionyear','age_year',"Status",
                            'newlifespan','TQ','SexEstimate','newstat',
-                           'avg_invert','FieldPeriodID', "CatchTime")] 
+                           'avg_invert','FieldPeriodID', "CatchTime", 'BodyMass')] 
 
 tarsus <- bodymass 
 
@@ -46,6 +46,7 @@ provi1 <- provi1 %>% filter(!is.na(prate)) %>%
   
 fatscore <- fatscore %>% filter(!is.na(FatScore)) %>% 
   mutate(lifespan_years = round(newlifespan/365))
+
 tarsus <- tarsus %>% filter(!is.na(RightTarsus)) %>% 
   mutate(lifespan_years = round(newlifespan/365))
 
@@ -275,6 +276,9 @@ tarsusimpu <- tarsus_clean %>%
 
 telo_pred<-make.predictorMatrix(teloimpu)
 
+telo_pred[c('RTL'), "BirdID"] <- -2  # Random intercept group indicator
+telo_pred["BirdID",c('RTL')] <- -2 
+
 #values in predictor: 0 means not used in imputation and 1 means used.
 telo_exclude <- c('birthyear', 'Whodunnit', 'occasionyear')
 
@@ -291,7 +295,7 @@ telo_method <- c(
   occasionyear = "",        # exclude
   age_year = "",            # derived
   newlifespan = "",         # fixed per bird
-  newFPID = "",          # continuous
+  FPID = "",          # continuous
   newstat = "polyreg",      # categorical (factor with >2 levels)
   RTL = "2l.lmer",      # continuous
   Whodunnit = "",            # character — exclude or factor if needed
@@ -305,12 +309,12 @@ teloimpu$BirdID<-as.integer(teloimpu$BirdID)
 teloimpu$SexEstimate<-as.factor(teloimpu$SexEstimate)
 
 #imputation 
-telo_imp_done <- mice(teloimpu, method = telo_method, predictorMatrix = telo_pred, m = 5)
+telo_imp_done <- mice(teloimpu, method = telo_method, predictorMatrix = telo_pred, m = 10)
 # str(bm_impu)
 
 
 #this pulls the iterations of the imputation 
-telo_imputed_data <- complete(telo_imp_done, c(1:5))
+telo_imputed_data <- complete(telo_imp_done, c(1:10))
 
 #check missingness pattern of data 
 md.pattern(telo_imputed_data, rotate.names = T)
@@ -330,44 +334,50 @@ teloimpu_densityplot <- ggplot(telo_completed_data, aes(x=RTL, colour=.imp)) +
 
 ## haem/ buffy coat ----
 # Setup predictor matrix and method
+buffyimpu<-buffyimpu%>%
+  select(-CatchTime)
 
-haem_pred<-make.predictorMatrix(haemimpu)
+buffypred<-make.predictorMatrix(buffyimpu)
+
+buffypred[c('BuffyCoat'), "BirdID"] <- -2  # Random intercept group indicator
+buffypred["BirdID",c('BuffyCoat')] <- -2 
 
 #values in predictor: 0 means not used in imputation and 1 means used.
-haem_exclude <- c('birthyear', 'Observer', 'occasionyear')
+buffy_exclude <- c('birthyear', 'Observer', 'occasionyear')
 
-haem_pred[, haem_exclude] <- 0
+buffypred[, buffy_exclude] <- 0
 
 #method for imputation 
-haem_method<-make.method(haem_pred)
+buffymethod<-make.method(buffypred)
 
-haem_method <- c(
+buffymethod <- c(
   BirdID = "",              # ID — exclude
   birthyear = "",           # exclude
   occasionyear = "",        # exclude
   age_year = "",            # derived
   newlifespan = "",         # fixed per bird
-  newFPID = "",          # continuous
+  FPID = "",          # continuous
   newstat = "polyreg",      # categorical (factor with >2 levels)
   BuffyCoat = "2l.lmer",      # continuous
   Observer = "",            # character — exclude or factor if needed
-  SexEstimate = "logreg",   # categorical - 2 levels factor
-  new_bug = "pmm"           # numeric  this also fine 
+  new_bug = "pmm",           # numeric  this also fine , 
+  SexEstimate='',
+  CatchTime='pmm'
 )
 
-colnames(haemimpu)
+colnames(buffyimpu)
 
 #imputation 
-haem_imp_done <- mice(haemimpu, method = haem_method, predictorMatrix = haem_pred, m = 5)
+buffydone <- mice(buffyimpu, method = buffymethod, predictorMatrix = buffypred, m = 10)
 # str(bm_impu)
 
 
 #this pulls the iterations of the imputation 
-haem_imputed_data <- complete(haem_imp_done, c(1:5))
+buffy_complete <- complete(buffydone, c(1:10))
 
 #check missingness pattern of data 
-md.pattern(haem_imputed_data, rotate.names = T)
-
+# md.pattern(haem_imputed_data, rotate.names = T)
+# 
 na_haem<-filter(haem_imputed_data, is.na(haem_imputed_data$BuffyCoat))
 
 
@@ -382,7 +392,12 @@ haemimpu_densityplot <-ggplot(haem_completed_data, aes(x=BuffyCoat, colour=.imp)
 ## Provi ---- 
 # Setup predictor matrix and method
 
-provi_pred<-make.predictorMatrix(proviimpu)
+provimpu2<-provimpu%>%
+  select(-c(nr_helpers, WatchType,BroodSize))
+
+provi_pred<-make.predictorMatrix(provimpu)
+provi_pred[c('prate'), "BirdID"] <- -2  # Random intercept group indicator
+provi_pred["BirdID",c('prate')] <- -2 
 
 #values in predictor: 0 means not used in imputation and 1 means used.
 provi_exclude <- c('birthyear', 'Observer', 'occasionyear')
@@ -396,20 +411,23 @@ provi_method <- c(
   BirdID = "",              # ID — exclude
   birthyear = "",           # exclude
   occasionyear = "",        # exclude
-  age_year = "",            # derived
-  newlifespan = "",         # fixed per bird
-  newFPID = "",          # continuous
+  age_year = "pmm",            # derived
+  newlifespan = "pmm",         # fixed per bird
+  FPID = "",          # continuous
   newstat = "polyreg",      # categorical (factor with >2 levels)
   prate = "2l.lmer",      # continuous
   Observer = "",            # character — exclude or factor if needed
   SexEstimate = "logreg",   # categorical - 2 levels factor
-  new_bug = "pmm"           # numeric  this also fine 
+  new_bug = "pmm",           # numeric  this also fine,  
+  nr_helpers='pmm',   
+  WatchType='',  
+  BroodSize='pmm'
 )
 
-colnames(proviimpu)
+colnames(provimpu)
 
 #imputation 
-provi_imp_done <- mice(proviimpu, method = provi_method, predictorMatrix = provi_pred, m = 5)
+provi_imp_done <- mice(provimpu, method = provi_method, predictorMatrix = provi_pred, m = 5)
 # str(bm_impu)
 
 
@@ -432,9 +450,11 @@ proviimpu_densityplot <-ggplot(provi_completed_data, aes(x=prate, colour=.imp)) 
 
 ## fat score ----
 # Setup predictor matrix and method
-
+library(micemd)
 fatscore_pred<-make.predictorMatrix(fatscoreimpu)
 
+fatscore_pred[c('FatScore'), "BirdID"] <- -2  # Random intercept group indicator
+fatscore_pred["BirdID",c('FatScore')] <- -2 
 #values in predictor: 0 means not used in imputation and 1 means used.
 fatscore_exclude <- c('birthyear', 'Observer', 'occasionyear')
 
@@ -450,12 +470,13 @@ fatscore_method <- c(
   occasionyear = "",        # exclude
   age_year = "",            # derived
   newlifespan = "",         # fixed per bird
-  newFPID = "",          # continuous
+  FPID = "",          # continuous
   newstat = "polyreg",      # categorical (factor with >2 levels)
-  FatScore = "2l.lmer",      # continuous
+  FatScore = "2l.glm.pois",      # continuous
   Observer = "",            # character — exclude or factor if needed
   SexEstimate = "logreg",   # categorical - 2 levels factor
-  new_bug = "pmm"           # numeric  this also fine 
+  new_bug = "pmm",           # numeric  this also fine 
+  CatchTime_mins='pmm'
 )
 
 colnames(fatscoreimpu)
@@ -464,6 +485,8 @@ colnames(fatscoreimpu)
 fatscore_imp_done <- mice(fatscoreimpu, method = fatscore_method, predictorMatrix = fatscore_pred, m = 5)
 # str(bm_impu)
 
+
+micemd::mice.impute.2l.glm.pois(fatscoreimpu, predictorMatrix=fatscore_pred, m=5)
 
 #this pulls the iterations of the imputation 
 fatscore_imputed_data <- complete(fatscore_imp_done, c(1:5))
@@ -483,59 +506,61 @@ fatscoreimpu_densityplot <-ggplot(fatscore_completed_data, aes(x=FatScore, colou
 
 
 ## Tarsus ----
+#done while doing body mass 
+
 # Setup predictor matrix and method
-
-tarsus_pred<-make.predictorMatrix(tarsusimpu)
-
-#values in predictor: 0 means not used in imputation and 1 means used.
-tarsus_exclude <- c('birthyear', 'Observer', 'occasionyear')
-
-tarsus_pred[, tarsus_exclude] <- 0
-
-#method for imputation 
-tarsus_method<-make.method(tarsus_pred)
-
-# chuen removed catch time, should not matter for tarsus
-tarsus_method <- c(
-  BirdID = "",              # ID — exclude
-  birthyear = "",           # exclude
-  occasionyear = "",        # exclude
-  age_year = "",            # derived
-  newlifespan = "",         # fixed per bird
-  newFPID = "",          # continuous
-  newstat = "polyreg",      # categorical (factor with >2 levels)
-  RightTarsus = "2l.lmer",      # continuous
-  Observer = "",            # character — exclude or factor if needed
-  SexEstimate = "logreg",   # categorical - 2 levels factor
-  new_bug = "pmm"           # numeric  this also fine 
-)
-
-colnames(tarsusimpu)
-
-#imputation 
-tarsus_imp_done <- mice(tarsusimpu, method = tarsus_method, predictorMatrix = tarsus_pred, m = 5)
-# str(bm_impu)
-
-
-#this pulls the iterations of the imputation 
-tarsus_imputed_data <- complete(tarsus_imp_done, c(1:5))
-
-#check missingness pattern of data 
-md.pattern(tarsus_imputed_data, rotate.names = T)
-
-na_tarsus<-filter(tarsus_imputed_data, is.na(tarsus_imputed_data$RightTarsus))
-
-
-tarsus_completed_data<-complete(tarsus_imp_done, action='long', include=T, all=T)
-#this pulls all of the dataframes, 0 is original data 
-tarsus_completed_data$.imp<-as.factor(tarsus_completed_data$.imp)
-
-tarsusimpu_densityplot <-ggplot(tarsus_completed_data, aes(x=RightTarsus, colour=.imp)) + geom_density()
-
-library(ggpubr)
-ggarrange(teloimpu_densityplot,
-          haemimpu_densityplot,
-          proviimpu_densityplot,
-          fatscoreimpu_densityplot,
-          tarsusimpu_densityplot, 
-          common.legend=T,labels="AUTO", legend = "bottom")
+# 
+# tarsus_pred<-make.predictorMatrix(tarsusimpu)
+# 
+# #values in predictor: 0 means not used in imputation and 1 means used.
+# tarsus_exclude <- c('birthyear', 'Observer', 'occasionyear')
+# 
+# tarsus_pred[, tarsus_exclude] <- 0
+# 
+# #method for imputation 
+# tarsus_method<-make.method(tarsus_pred)
+# 
+# # chuen removed catch time, should not matter for tarsus
+# tarsus_method <- c(
+#   BirdID = "",              # ID — exclude
+#   birthyear = "",           # exclude
+#   occasionyear = "",        # exclude
+#   age_year = "",            # derived
+#   newlifespan = "",         # fixed per bird
+#   FPID = "",          # continuous
+#   newstat = "polyreg",      # categorical (factor with >2 levels)
+#   RightTarsus = "2l.lmer",      # continuous
+#   Observer = "",            # character — exclude or factor if needed
+#   SexEstimate = "logreg",   # categorical - 2 levels factor
+#   new_bug = "pmm"           # numeric  this also fine 
+# )
+# 
+# colnames(tarsusimpu)
+# 
+# #imputation 
+# tarsus_imp_done <- mice(tarsusimpu, method = tarsus_method, predictorMatrix = tarsus_pred, m = 5)
+# # str(bm_impu)
+# 
+# 
+# #this pulls the iterations of the imputation 
+# tarsus_imputed_data <- complete(tarsus_imp_done, c(1:5))
+# 
+# #check missingness pattern of data 
+# md.pattern(tarsus_imputed_data, rotate.names = T)
+# 
+# na_tarsus<-filter(tarsus_imputed_data, is.na(tarsus_imputed_data$RightTarsus))
+# 
+# 
+# tarsus_completed_data<-complete(tarsus_imp_done, action='long', include=T, all=T)
+# #this pulls all of the dataframes, 0 is original data 
+# tarsus_completed_data$.imp<-as.factor(tarsus_completed_data$.imp)
+# 
+# tarsusimpu_densityplot <-ggplot(tarsus_completed_data, aes(x=RightTarsus, colour=.imp)) + geom_density()
+# 
+# library(ggpubr)
+# ggarrange(teloimpu_densityplot,
+#           haemimpu_densityplot,
+#           proviimpu_densityplot,
+#           fatscoreimpu_densityplot,
+#           tarsusimpu_densityplot, 
+#           common.legend=T,labels="AUTO", legend = "bottom")

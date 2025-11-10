@@ -86,9 +86,10 @@ bm_filled<-bm_filled%>%
   arrange(BirdID,age_year)
 
 
+
 #max age is 20, but remove any rows created beyond age 17. no body mass older than 17. 
 
-bm_filled<-filter(bm_filled, bm_filled$age_year<=17)
+bm_filled<-filter(bm_filled, bm_filled$age_year<=17 & bm_filled$age_year>0)
 
 #field period fill as the main breeding season of that year 
 
@@ -103,7 +104,7 @@ fps<-fps%>%
 fps<-as.data.frame(fps)
 
 #need to fill in now 
-#ng g how 
+
 fpsmain <- fps %>% arrange(season) %>% distinct(PeriodYear,.keep_all = T) %>% 
   dplyr::select(FieldPeriodID,PeriodYear) %>% rename(newFPID = FieldPeriodID)
 bm_filled_2 <- merge(bm_filled,fpsmain,by.x="occasionyear",by.y="PeriodYear",all.x=T ) %>%
@@ -180,7 +181,7 @@ bm_impu<-bm_clean%>%
   select(BirdID, birthyear,occasionyear, age_year, newlifespan, newFPID, newstat, BodyMass, RightTarsus, 
          Observer, SexEstimate, CatchTime_mins, new_bug)
 
-#chat gpt code 
+ 
 
 #view missingness 
 md.pattern(bm_impu, rotate.names = T)
@@ -219,7 +220,7 @@ bm_pred["BirdID",c('BodyMass','RightTarsus')] <- -2  # Random intercept group in
 
 
 
-
+diag(bm_pred) <- 0
 
 
 
@@ -253,8 +254,8 @@ imp <- mice(bm_impu, method = bm_method, predictorMatrix = bm_pred, m = 5)
 
 
 #checking ID and observations 
-what<-bm%>%group_by(BirdID)%>%summarize(bmnr=length(BodyMass))
-tf<-eh%>%group_by(bmnr)%>%summarise(length=n())
+# what<-bm%>%group_by(BirdID)%>%summarize(bmnr=length(BodyMass))
+# tf<-eh%>%group_by(bmnr)%>%summarise(length=n())
 #731 birds with only 1 observation, 347 birds with only 2 observations 
 
 
@@ -287,12 +288,13 @@ bwplot(imp)
 stripplot(imp,pch = c(21, 20), cex = c(1, 1.5))
 
 
-fit <- with(imp, glm(ici(BodyMass) ~ age_year + newlifespan,
+fit <- with(imp, glm(ici(BodyMass) ~ age_year + newlifespan + RightTarsus + new_bug 
+                     + SexEstimate +(1|BirdID),
                      family = gaussian))
 ps <- rep(rowMeans(sapply(fit$analyses, fitted.values)),
           imp$m + 1)
-xyplot(imp, BodyMass ~ age_year | as.factor(.imp),
-       xlab = "age",
+xyplot(imp, BodyMass ~ ps | as.factor(.imp),
+       xlab = "probability",
        ylab = "bm", pch = c(1, 19), col = mdc(1:2), alpha=0.4)
 
 
