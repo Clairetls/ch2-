@@ -250,6 +250,9 @@ bm_impu$SexEstimate<-as.factor(bm_impu$SexEstimate)
 
 #imputation 
 imp <- mice(bm_impu, method = bm_method, predictorMatrix = bm_pred, m = 5)
+
+imp2 <- mice(bm_impu, method = bm_method, predictorMatrix = bm_pred, m = 20)
+
 # str(bm_impu)
 
 
@@ -288,8 +291,7 @@ bwplot(imp)
 stripplot(imp,pch = c(21, 20), cex = c(1, 1.5))
 
 
-fit <- with(imp, glm(ici(BodyMass) ~ age_year + newlifespan + RightTarsus + new_bug 
-                     + SexEstimate +(1|BirdID),
+fit <- with(imp, glm(ici(BodyMass) ~ age_year + newlifespan,
                      family = gaussian))
 ps <- rep(rowMeans(sapply(fit$analyses, fitted.values)),
           imp$m + 1)
@@ -304,8 +306,8 @@ xyplot(imp, BodyMass ~ ps | as.factor(.imp),
 #############
 
 
-
-
+library(gamlss)
+library(gratia)
 
 
 

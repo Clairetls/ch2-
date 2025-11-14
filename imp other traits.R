@@ -1,5 +1,7 @@
 # fat score imputation 
 
+library(gsl)
+
 colnames(bodymass) # these are columns needed for each trait
 
 # bodymass, fat score, tarsus, TL, provisioning rate, female buffycoat
@@ -400,7 +402,11 @@ provi_pred[c('prate'), "BirdID"] <- -2  # Random intercept group indicator
 provi_pred["BirdID",c('prate')] <- -2 
 
 #values in predictor: 0 means not used in imputation and 1 means used.
-provi_exclude <- c('birthyear', 'Observer', 'occasionyear')
+provi_exclude <- c('birthyear', 'Observer', 'occasionyear', 'nr_helpers', 'WatchType','BroodSize')
+
+#originally tried to include nr helpers and brood size as predictors, but seems to not impute
+#perhaps too many NAs and not enough variation. 
+
 
 provi_pred[, provi_exclude] <- 0
 
@@ -415,16 +421,16 @@ provi_method <- c(
   newlifespan = "pmm",         # fixed per bird
   FPID = "",          # continuous
   newstat = "polyreg",      # categorical (factor with >2 levels)
-  prate = "2l.lmer",      # continuous
+  prate = "pmm",      # continuous
   Observer = "",            # character — exclude or factor if needed
   SexEstimate = "logreg",   # categorical - 2 levels factor
   new_bug = "pmm",           # numeric  this also fine,  
-  nr_helpers='pmm',   
+  nr_helpers='',   
   WatchType='',  
-  BroodSize='pmm'
+  BroodSize=''
 )
 
-colnames(provimpu)
+# colnames(provimpu)
 
 #imputation 
 provi_imp_done <- mice(provimpu, method = provi_method, predictorMatrix = provi_pred, m = 5)
@@ -450,6 +456,14 @@ proviimpu_densityplot <-ggplot(provi_completed_data, aes(x=prate, colour=.imp)) 
 
 ## fat score ----
 # Setup predictor matrix and method
+fatscoreimpu$CatchTime<-chron(times=fatscoreimpu$CatchTime)
+fatscoreimpu$CatchTime_mins<-60 * 24 * as.numeric(times(fatscoreimpu$CatchTime))
+
+
+fatscoreimpu<-fatscoreimpu %>%
+  select(-CatchTime)
+  
+
 library(micemd)
 fatscore_pred<-make.predictorMatrix(fatscoreimpu)
 
@@ -472,21 +486,21 @@ fatscore_method <- c(
   newlifespan = "",         # fixed per bird
   FPID = "",          # continuous
   newstat = "polyreg",      # categorical (factor with >2 levels)
-  FatScore = "2l.glm.pois",      # continuous
+  FatScore = "2l.lmer",      # continuous
   Observer = "",            # character — exclude or factor if needed
   SexEstimate = "logreg",   # categorical - 2 levels factor
   new_bug = "pmm",           # numeric  this also fine 
   CatchTime_mins='pmm'
 )
 
-colnames(fatscoreimpu)
+# colnames(fatscoreimpu)
 
 #imputation 
 fatscore_imp_done <- mice(fatscoreimpu, method = fatscore_method, predictorMatrix = fatscore_pred, m = 5)
 # str(bm_impu)
 
 
-micemd::mice.impute.2l.glm.pois(fatscoreimpu, predictorMatrix=fatscore_pred, m=5)
+test<-mice.impute.2l.glm.pois(fatscoreimpu, x=fatscore_pred, m=5)
 
 #this pulls the iterations of the imputation 
 fatscore_imputed_data <- complete(fatscore_imp_done, c(1:5))
