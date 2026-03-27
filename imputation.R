@@ -300,7 +300,7 @@ xyplot(imp, BodyMass ~ ps | as.factor(.imp),
        ylab = "bm", pch = c(1, 19), col = mdc(1:2), alpha=0.4)
 
 
-
+write.csv(completed_data, 'imputed_bm.csv')
 
 
 #############
@@ -308,6 +308,48 @@ xyplot(imp, BodyMass ~ ps | as.factor(.imp),
 
 library(gamlss)
 library(gratia)
+write.csv(bm_impu, 'bm_impu.csv')
 
+
+#################################
+library(micemd)
+
+type<-vector()
+
+mice.impute.2l.lmer(bm_impu$BodyMass, ry=, x=bm_pred, type=)
+
+
+bm_samplesize<-bodymass%>%
+  group_by(age_year)%>%
+  summarise(samplesize=n())
+
+telo_s<-telo1%>%
+  group_by(age_year)%>%
+  summarise(samplesize=n())
+
+prate_s<-provi%>%
+  group_by(age_years)%>%
+  summarise(samplesize=n())
+
+fat_s<-fatscore%>%
+  group_by(age_year)%>%
+  summarise(samplesize=n())
+
+buffy_s<-buffy_w%>%
+  group_by(age_year)%>%
+  summarise(samplesize=n())
+
+
+tars_s<-bodymass%>%
+  group_by(age_year)%>%
+  summarise(samplesize=length(RightTarsus))
+
+###############################################
+lifespan<-read.csv('lifespan_28_5_24.csv')
+hist(lifespan$newlifespan, breaks = 20, xlab = 'Count', ylab = 'lifespan (days)',
+     main = NULL, xlim = c(0,7000), ylim=c(0,2500))
+title('Distribution of lifespan')
+ggplot(lifespan, aes(x=newlifespan))+geom_histogram(bins = 20, colour='black', fill='grey')+
+  theme_cowplot()+xlab('Lifespan (days)')
 
 

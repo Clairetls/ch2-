@@ -31,7 +31,7 @@ fatscore <- physio[,c('BirdID','FatScore','Observer','birthyear',
                            'newlifespan','TQ','SexEstimate','newstat',
                            'avg_invert','FieldPeriodID', "CatchTime", 'BodyMass')] 
 
-tarsus <- bodymass 
+# tarsus <- bodymass 
 
 # remove na measurements of each trait 
 # bodymass2
@@ -86,12 +86,12 @@ tarsusfilled <- fillrows(tarsus, 1)
 
 telofilled<-telofilled%>%
   arrange(BirdID,age_year)
-buffyfilled<-buffyfilled%>%
-  arrange(BirdID,age_year)
+# buffyfilled<-buffyfilled%>%
+#   arrange(BirdID,age_year)
 provifilled<-provifilled%>%
   arrange(BirdID,age_year)
-fatscorefilled<-fatscorefilled%>%
-  arrange(BirdID,age_year)
+# fatscorefilled<-fatscorefilled%>%
+#   arrange(BirdID,age_year)
 tarsusfilled<-tarsusfilled%>%
   arrange(BirdID,age_year)
 
@@ -173,6 +173,7 @@ teloimpu <- telo_clean %>%
          FPID, newstat, RTL, Whodunnit, SexEstimate, new_bug) %>%
   mutate(newstat = as.factor(newstat), SexEstimate = as.factor(SexEstimate), BirdID=as.integer(BirdID))
 
+write.csv(teloimpu, 'teloimpu.csv')
 
 
 # fill buffy coat
@@ -222,6 +223,9 @@ provimpu <- prov_clean %>%
          FPID, newstat, prate, Observer, SexEstimate, new_bug, 
          BroodSize, nr_helpers, WatchType) %>%
   mutate(newstat = as.factor(newstat), SexEstimate = as.factor(SexEstimate), BirdID=as.integer(BirdID))
+
+
+write.csv(provimpu, 'provimpu.csv')
 
 
 # fill fat score
@@ -417,11 +421,11 @@ provi_method <- c(
   BirdID = "",              # ID — exclude
   birthyear = "",           # exclude
   occasionyear = "",        # exclude
-  age_year = "pmm",            # derived
-  newlifespan = "pmm",         # fixed per bird
+  age_year = "",            # derived
+  newlifespan = "",         # fixed per bird
   FPID = "",          # continuous
   newstat = "polyreg",      # categorical (factor with >2 levels)
-  prate = "pmm",      # continuous
+  prate = "2l.lmer",      # continuous
   Observer = "",            # character — exclude or factor if needed
   SexEstimate = "logreg",   # categorical - 2 levels factor
   new_bug = "pmm",           # numeric  this also fine,  
@@ -516,6 +520,8 @@ fatscore_completed_data<-complete(fatscore_imp_done, action='long', include=T, a
 fatscore_completed_data$.imp<-as.factor(fatscore_completed_data$.imp)
 
 fatscoreimpu_densityplot <-ggplot(fatscore_completed_data, aes(x=FatScore, colour=.imp)) + geom_density()
+
+
 
 
 

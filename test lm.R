@@ -66,7 +66,7 @@ bm$age_year[bm$age_year>=14]<-14
 
 
 #get relative lifetime fitness 
-r<-0.9223668  #value from leslie matrix from other script
+r<-log(0.9223668)  #value from leslie matrix from other script
 e<-exp(1)
 
 relativefit<-ars%>%
@@ -492,3 +492,5 @@ ped<-filter(ped, ped$GenDadConfidence>= 80 & ped$GenMumConfidence >=80)
 oldped<-read.csv('C:/PhD/Data/modelling dfs for habrok/Dataframes 28_5_24/repro_28_5.csv')
 length(unique(oldped$BirdID))
 length(unique(ped$GeneticFather))
+
+
