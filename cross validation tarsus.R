@@ -94,6 +94,11 @@ ggplot(tarspts, aes(x=og_tars, y=RightTarsus))+geom_point()+stat_smooth(method='
 cor(tarspts$og_tars, tarspts$RightTarsus)
 #0.7332804
 
+aaa<-lm(og_tars~RightTarsus, tarspts)
+summary(aaa)
+
+# 0.7142075
+# 0.6594864
 ####################################
 
 tars_op2<-sample_tars2[,c('BirdID', 'RightTarsus', 'rownr')]
@@ -109,6 +114,8 @@ ggplot(tarspts2, aes(x=og_tars, y=RightTarsus))+geom_point()+stat_smooth(method=
 
 cor(tarspts2$og_tars, tarspts2$RightTarsus)
 # 0.7400665
+
+
 
 
 ############# telomeres #############################

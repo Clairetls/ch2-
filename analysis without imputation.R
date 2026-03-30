@@ -14,8 +14,8 @@ tblbirdid<-sqlFetch(swdb, 'tblBirdID', stringsAsFactors=F)
 
 
 
-telomere_28_5 <- read_csv("telomere_28_5.csv")
-haem <- read_csv("haematocrit_28_5.csv")
+telomere_28_5 <- read.csv("telomere_28_5.csv")
+# haem <- read_csv("haematocrit_28_5.csv")
 provi <- read.csv("provisioning_28_5.csv", sep=";")
 physio<-read.csv('physio_28_5.csv')
 
@@ -39,7 +39,7 @@ ars$age[ars$age==-1]<-0
 telo1 <- telomere_28_5[,c('BirdID','RTL','Whodunnit', 'birthyear',
                           'occasionyear','age_year',"Status",
                           'newlifespan','TQ','SexEstimate','newstat',
-                          'avg_invert','FieldPeriodID')] 
+                          'avg_invert','FieldPeriodID', 'PlateID')] 
 
 buffy <- haem[,c('BirdID','BuffyCoat','Observer', 'birthyear',
                  'occasionyear','age',"Status",
@@ -104,6 +104,7 @@ lrs<-ars%>%
   summarise(lrs=sum(ars))           
 
 ##############################################
+#RTL
 
 life_w<-read.csv('lifetimefitness.csv')
 life_w<-life_w[,-c(1)]
@@ -129,28 +130,37 @@ telo_mod$age_year[telo_mod$age_year>=12]<-12
 
 telo_mod$logw<-log(telo_mod$w)
 
+plate53<-filter(telo_mod, telo_mod$PlateID==53)
+
+telo_mod<-filter(telo_mod, telo_mod$PlateID!=53)
+
 telo_byage<-split(telo_mod, telo_mod$age_year)
 
 telobyage <- lapply(telo_byage, function(x) {
   x$RTL_z <- scale(x$RTL)
-  x$w_z<-scale(x$w)
+  x$w1_z<-scale(x$w1)
   return(x)
 })
 
+# teloage0<-telobyage[[1]]
+# 
+test<-glmmTMB(w1_z ~ RTL_z, data=telobyage[[1]], family = gaussian(), ziformula = ~1)
+summary(test)$coefficient$cond[2,c(1,4)]
+
 modelfunc<-function(x){
-  model<-glmmTMB(w ~ RTL_z+SexEstimate, data=x, family=Gamma())
+  model<-glmmTMB(w1_z ~ RTL_z, data=x, family=gaussian(), ziformula = ~1)
   return(summary(model)$coefficient$cond[2,c(1,4)])
 }
 
 modelfunc2<-function(x){
-  model<-glmmTMB(w~RTL_z+SexEstimate, data=x, family=Gamma())
+  model<-glmmTMB(w1_z~RTL_z, data=x, family=gaussian(), ziformula = ~1)
   return(model)
 }
 
 modelfunc3<-function(x){
   model<-glmmTMB(lrs~RTL_z+SexEstimate, data=x, family=poisson(), 
-                 ziformula=~1)
-  return(summary(model)$coefficient$cond[2,c(1,4)])
+                 ziformula= ~1)
+  return(summary(model)$coefficient[2,c(1,4)])
 }
 
 modelfunc4<-function(x){
@@ -161,8 +171,8 @@ modelfunc4<-function(x){
 
 
 
-age0mod<-glmmTMB(lrs~RTL_z+SexEstimate, data=telobyage[[1]], family=poisson(), 
-                 ziformula=~1)
+# age0mod<-glmmTMB(lrs~RTL_z+SexEstimate, data=telobyage[[1]], family=poisson(), 
+#                  ziformula=~1)
 
 telo_coeff<-lapply(telobyage, modelfunc) #weird results 
 
@@ -173,23 +183,33 @@ telo_coeff3<-lapply(telobyage, modelfunc3)  #modelling with LRS
 telo_mods4<-lapply(telobyage, modelfunc4)  #modelling with LRS 
 
 
-t_coeff3<-as.data.frame(do.call(rbind,telo_coeff3))
+t_coeff<-as.data.frame(do.call(rbind,telo_coeff))
 
-t_coeff3$age<-c(0:12)
-plot(t_coeff3$age, t_coeff3$Estimate)
+t_coeff$age<-c(0:12)
+plot(t_coeff$age, t_coeff$Estimate)
+
+
+
+library(cowplot)
+ggplot(t_coeff, aes(x=age, y=Estimate))+geom_point()+stat_smooth(method='lm') +labs(title='Telomere Length')+theme_cowplot()
 
 age1model<-telo_coeff2[[2]]
 
+names(telo_coeff2)<-c('teloage0','teloage1','teloage2','teloage3','teloage4','teloage5',
+                     'teloage6','teloage7','teloage8','teloage9','teloage10','teloage11','teloage12')
+
+summary(telo_coeff2[[1]])
 
 ############
 #checking model fit 
 library(DHARMa)
 
-simulateResiduals(age1model, plot = T)
+simulateResiduals(telo_coeff2[[8]], plot = T)
+
 age1model
 t_coeff<-as.data.frame(do.call(rbind,telo_coeff))
 
-simulateResiduals(telo_coeff2[[1]], plot=T)
+simulateResiduals(telo_coeff2[[12]], plot=T)
 
 t_coeff$age<-c(0:12)
 plot(t_coeff$age, t_coeff$Estimate)
@@ -199,19 +219,11 @@ telo_mod$age_year<-as.factor(telo_mod$age_year)
 
 ggplot(telo_mod, aes(y = w, colour = age_year))+geom_histogram() 
 
-#########################################################
-#buffy coat needs imputation - sample size is low 
-
-buffy_w<-left_join(buffy, lifetime_w,by='BirdID')
-
-buffy_w<-left_join(buffy_w, lrs, by='BirdID')
-
-
-buffy_w$age_year<-as.factor(buffy_w$age)
-ggplot(buffy_w, aes(x=BuffyCoat, y=w,colour = age_year))+geom_point()+stat_smooth(method='lm')
 
 
 #########################################################
+
+#tarsus 
 
 
 
