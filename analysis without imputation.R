@@ -99,9 +99,17 @@ for(i in unique(relativefit$BirdID)){
   lifetime_w<-rbind(lifetime_w,onerow)
 }
 
+#WHY DID I DO THIS?? 
+
+max(lifetime_w$w)
+
 lrs<-ars%>%
   group_by(BirdID)%>%
   summarise(lrs=sum(ars))           
+
+
+
+write.csv(lifetime_w, 'lifetimefitness.csv')
 
 ##############################################
 #RTL
