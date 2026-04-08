@@ -152,6 +152,7 @@ dfage1<-modelchecker(tarsmodelperage[[1]])
 
 modelcheckperage<-lapply(tarsmodelperage ,function(x){modelchecker(x)})
 
+View(modelcheckperage[[2]])
 
 
 # View(tarsmodelperage[[1]])
@@ -169,8 +170,15 @@ tarscoeffperage<-lapply(modelavgperage,
 tarscoeffperagedf<-do.call(rbind.data.frame, tarscoeffperage)
 tarscoeffperagedf$age<-as.numeric(rownames(tarscoeffperagedf))
 
+write.csv(tarscoeffperagedf, 'tarscoeffperagedf.csv')
+tarscoeffperagedf$ymin<-tarscoeffperagedf$Estimate-1.96*tarscoeffperagedf$`Std. Error`
+tarscoeffperagedf$ymax<-tarscoeffperagedf$Estimate+1.96*tarscoeffperagedf$`Std. Error`
 
-tarsselection<-ggplot(tarscoeffperagedf, aes(x=age, y=Estimate))+stat_smooth(method='lm')+geom_point()+
+tarsselection<-ggplot(tarscoeffperagedf, aes(x=age, y=Estimate))+
+  stat_smooth(method='lm')+geom_point()+
+  geom_errorbar(aes(ymin = (Estimate-`Std. Error`), ymax=(Estimate+`Std. Error`)), alpha=0.3)
+
+tarsselection
 
 thing<-summary(model.avg(tarsmodelperage[[1]]))
 b<-as.data.frame(as_tibble_row(thing$coefmat.full["cond(RightTarsus)",]))

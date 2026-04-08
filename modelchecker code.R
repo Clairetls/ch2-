@@ -58,9 +58,11 @@ modelchecker <- function(check) {
     filter(`Converge?-2` != "NaN") %>%
     arrange(AIC)
   
-  View(test)
-  View(final)
+  # View(test)
+  # View(final)
   write.csv(final, "final.models.csv", row.names = F)
   write.csv(test, "all.models.csv", row.names = F)
+  return(test)
+  return(final)
   
 }
