@@ -16,7 +16,7 @@ tblbirdid<-sqlFetch(swdb, 'tblBirdID', stringsAsFactors=F)
 
 telomere_28_5 <- read.csv("telomere_28_5.csv")
 # haem <- read_csv("haematocrit_28_5.csv")
-provi <- read.csv("provisioning_28_5.csv", sep=";")
+provi <- read.csv("provisioning_28_5.csv", sep=";", dec = ',')
 physio<-read.csv('physio_28_5.csv')
 
 
@@ -41,21 +41,21 @@ telo1 <- telomere_28_5[,c('BirdID','RTL','Whodunnit', 'birthyear',
                           'newlifespan','TQ','SexEstimate','newstat',
                           'avg_invert','FieldPeriodID', 'PlateID')] 
 
-buffy <- haem[,c('BirdID','BuffyCoat','Observer', 'birthyear',
-                 'occasionyear','age',"Status",
-                 'newlifespan','TQ','CatchTime','SexEstimate','newstat',
-                 'avg_invert','FieldPeriodID')] 
+# buffy <- haem[,c('BirdID','BuffyCoat','Observer', 'birthyear',
+#                  'occasionyear','age',"Status",
+#                  'newlifespan','TQ','CatchTime','SexEstimate','newstat',
+#                  'avg_invert','FieldPeriodID')] 
 
 provi1 <- provi[,c('BirdID','birthyear','occasionyear','age','newlifespan',
                    'prate','Observer', "Status",'TQ','SexEstimate','newstat',
                    'avg_invert','FieldPeriodID','BroodSize','nr_helpers','WatchType')] 
 
-fatscore <- physio[,c('BirdID','FatScore','Observer','birthyear',
-                      'occasionyear','age_year',"Status",
-                      'newlifespan','TQ','SexEstimate','newstat',
-                      'avg_invert','FieldPeriodID', "CatchTime", 'BodyMass')] 
+# fatscore <- physio[,c('BirdID','FatScore','Observer','birthyear',
+#                       'occasionyear','age_year',"Status",
+#                       'newlifespan','TQ','SexEstimate','newstat',
+#                       'avg_invert','FieldPeriodID', "CatchTime", 'BodyMass')] 
 
-buffy <- buffy %>% filter(!is.na(BuffyCoat) & SexEstimate == 0) 
+# buffy <- buffy %>% filter(!is.na(BuffyCoat) & SexEstimate == 0) 
 
 physio<-physio[,-c(1)]
 
@@ -80,36 +80,36 @@ bodymass<-phys_clean[,c(1,2,3,11,12,22,25,26,28,29,31,33,35,36,37,38)]
 #getting relative lifetime fitness 
 
 
-r<-log(0.9223668)  #value from leslie matrix from other script
-e<-exp(1)
-
-relativefit<-ars%>%
-  group_by(BirdID)%>%
-  mutate(w1=ars*e^(-r*age))
-
-relativefit<-as.data.frame(relativefit)
-
-
-lifetime_w<-data.frame()
-
-for(i in unique(relativefit$BirdID)){
-  onebird<-filter(relativefit, relativefit$BirdID==i)
-  w1<-max(cumsum(onebird$w1))
-  onerow<-data.frame(BirdID=i, w=w1)
-  lifetime_w<-rbind(lifetime_w,onerow)
-}
-
-#WHY DID I DO THIS?? 
-
-max(lifetime_w$w)
-
-lrs<-ars%>%
-  group_by(BirdID)%>%
-  summarise(lrs=sum(ars))           
-
-
-
-write.csv(lifetime_w, 'lifetimefitness.csv')
+# r<-log(0.9223668)  #value from leslie matrix from other script
+# e<-exp(1)
+# 
+# relativefit<-ars%>%
+#   group_by(BirdID)%>%
+#   mutate(w1=ars*e^(-r*age))
+# 
+# relativefit<-as.data.frame(relativefit)
+# 
+# 
+# lifetime_w<-data.frame()
+# 
+# for(i in unique(relativefit$BirdID)){
+#   onebird<-filter(relativefit, relativefit$BirdID==i)
+#   w1<-max(cumsum(onebird$w1))
+#   onerow<-data.frame(BirdID=i, w=w1)
+#   lifetime_w<-rbind(lifetime_w,onerow)
+# }
+# 
+# #WHY DID I DO THIS?? 
+# 
+# max(lifetime_w$w)
+# 
+# lrs<-ars%>%
+#   group_by(BirdID)%>%
+#   summarise(lrs=sum(ars))           
+# 
+# 
+# 
+# write.csv(lifetime_w, 'lifetimefitness.csv')
 
 ##############################################
 #RTL
@@ -119,11 +119,11 @@ life_w<-life_w[,-c(1)]
 
 
 telo_w<-left_join(telo1, life_w, by='BirdID')
-telo_w<-left_join(telo_w, lrs, by='BirdID')
+# telo_w<-left_join(telo_w, lrs, by='BirdID')
 
 
 telo_w$w1[is.na(telo_w$w1)]<-0
-telo_w$lrs[is.na(telo_w$lrs)]<-0
+# telo_w$lrs[is.na(telo_w$lrs)]<-0
 
 
 
@@ -139,6 +139,7 @@ telo_mod$age_year[telo_mod$age_year>=12]<-12
 telo_mod$logw<-log(telo_mod$w)
 
 plate53<-filter(telo_mod, telo_mod$PlateID==53)
+
 
 telo_mod<-filter(telo_mod, telo_mod$PlateID!=53)
 
@@ -166,16 +167,26 @@ modelfunc2<-function(x){
 }
 
 modelfunc3<-function(x){
-  model<-glmmTMB(lrs~RTL_z+SexEstimate, data=x, family=poisson(), 
-                 ziformula= ~1)
-  return(summary(model)$coefficient[2,c(1,4)])
-}
-
-modelfunc4<-function(x){
-  model<-glmmTMB(lrs~RTL_z+SexEstimate, data=x, family=poisson(), 
-                 ziformula=~1)
+  model<-glmmTMB(w1~RTL, data=x, family=ziGamma(), ziformula = ~., control = glmmTMBControl(optimizer = optim , optArgs = list(method='BFGS')))
   return(model)
 }
+
+teloest_func<-function(x){
+  model<-glmmTMB(w1~RTL, data=x, family=ziGamma(), ziformula = ~., control = glmmTMBControl(optimizer = optim , optArgs = list(method='BFGS')))
+  return(summary(model)$coefficient$cond[2,c(1,4)])
+}
+
+# modelfunc3<-function(x){
+#   model<-glmmTMB(lrs~RTL_z+SexEstimate, data=x, family=poisson(), 
+#                  ziformula= ~1)
+#   return(summary(model)$coefficient[2,c(1,4)])
+# }
+
+# modelfunc4<-function(x){
+#   model<-glmmTMB(lrs~RTL_z+SexEstimate, data=x, family=poisson(), 
+#                  ziformula=~1)
+#   return(model)
+# }
 
 
 
@@ -186,20 +197,31 @@ telo_coeff<-lapply(telobyage, modelfunc) #weird results
 
 telo_coeff2<-lapply(telobyage, modelfunc2)
 
-telo_coeff3<-lapply(telobyage, modelfunc3)  #modelling with LRS 
+telo_mod2<-lapply(telobyage, modelfunc3)
 
-telo_mods4<-lapply(telobyage, modelfunc4)  #modelling with LRS 
+telo_est2<-lapply(telobyage, teloest_func)
+telo_zigammaest<-do.call(rbind.data.frame, telo_est2)
+colnames(telo_zigammaest)<-c('Estimate', 'p value')
+telo_zigammaest$age<-as.numeric(rownames(telo_zigammaest))
+
+# telo_coeff3<-lapply(telobyage, modelfunc3)  #modelling with LRS 
+# 
+# telo_mods4<-lapply(telobyage, modelfunc4)  #modelling with LRS 
 
 
 t_coeff<-as.data.frame(do.call(rbind,telo_coeff))
 
 t_coeff$age<-c(0:12)
 plot(t_coeff$age, t_coeff$Estimate)
-
+View(t_coeff)
 
 
 library(cowplot)
 ggplot(t_coeff, aes(x=age, y=Estimate))+geom_point()+stat_smooth(method='lm') +labs(title='Telomere Length')+theme_cowplot()
+
+telomod2plot<-ggplot(telo_zigammaest, aes(x=age, y=Estimate))+geom_point()+stat_smooth(method='lm') +labs(title='Telomere Length')+theme_cowplot()
+
+telomod2plot
 
 age1model<-telo_coeff2[[2]]
 
@@ -227,17 +249,101 @@ telo_mod$age_year<-as.factor(telo_mod$age_year)
 
 ggplot(telo_mod, aes(y = w, colour = age_year))+geom_histogram() 
 
+source('modelchecker code.R')
+
+telomod1check<-modelchecker(telo_coeff2)
+
+telomod2check<-modelchecker(telo_mod2)  #KS test results much better than gaussian, although AIC higher, but i think these models perform better. 
+
 
 
 #########################################################
 
-#tarsus 
+#provisioning 
 
 
+prov_w<-left_join(provi1, life_w, by='BirdID')
+# telo_w<-left_join(telo_w, lrs, by='BirdID')
 
 
+prov_w$w1[is.na(prov_w$w1)]<-0
 
 
+pagedist<-prov_w%>%
+  group_by(age)%>%
+  summarise(count=n())
+
+teloagedist<-telo_w%>%
+  group_by(age_year)%>%
+  summarise(count=n())
+
+provagedistplot<-ggplot(prov_w, aes(x=age))+geom_histogram(bins=18, alpha=0.5, colour='black')+theme_cowplot()
+teloagedistplot<-ggplot(telo_w, aes(x=age_year))+geom_histogram(bins=18, alpha=0.5, colour='black')+theme_cowplot()
+teloagedistplot
 
 
+View(pagedist)
 
+prov_w<-prov_w%>%
+  mutate(newage=case_when(age<9 ~ as.factor(age), 
+                          age==9 | age==10 ~ as.factor('9-10'),
+                          age ==11 | age ==12 ~as.factor('11-12'), 
+                          age > 12 ~ as.factor(13)))
+
+prov_w$newage<-as.character(prov_w$newage)
+
+# unique(prov_w$newage)
+prov_byage<-split(prov_w, prov_w$newage)
+
+prov_byage <- lapply(prov_byage, function(x) {
+  x$prate_z <- scale(x$prate)
+  x$w1_z<-scale(x$w1)
+  return(x)
+})
+
+provestfunc<-function(x){
+  model<-glmmTMB(w1_z ~ prate_z, data=x, family=gaussian(), ziformula = ~1)
+  return(summary(model)$coefficient$cond[2,c(1,4)])
+}
+
+provmodelfunc<-function(x){
+  model<-glmmTMB(w1_z~prate_z, data=x, family=gaussian(), ziformula = ~1)
+  return(model)
+}
+
+
+provest_gau<-lapply(prov_byage, provestfunc)  
+
+provmod_gau<-lapply(prov_byage, provmodelfunc)
+
+
+provest_gau<-do.call(rbind.data.frame,provest_gau )
+colnames(provest_gau)<-c('Estimate', 'p')
+provest_gau$age<-as.numeric(rownames(provest_gau))
+
+provestfunc_zi<-function(x){
+  model<-glmmTMB(w1 ~ prate, data=x, family=ziGamma(), ziformula = ~.,control = glmmTMBControl(optimizer = optim , optArgs = list(method='BFGS')))
+  return(summary(model)$coefficient$cond[2,c(1,4)])
+}
+
+provmodelfunc_zi<-function(x){
+  model<-glmmTMB(w1 ~prate, data=x, family=ziGamma(), ziformula = ~.,control = glmmTMBControl(optimizer = optim , optArgs = list(method='BFGS')))
+  return(model)
+}
+
+provest_zi<-lapply(prov_byage, provestfunc)  
+
+provmod_zi<-lapply(prov_byage, provmodelfunc)
+
+provest_zi<-do.call(rbind.data.frame,provest_zi )
+colnames(provest_zi)<-c('Estimate', 'p')
+provest_zi$age<-as.numeric(rownames(provest_zi))
+
+
+provgauplot<-ggplot(provest_gau, aes(x=age, y=Estimate))+geom_point()+stat_smooth(method='lm') +labs(title='Provisioning rate')+theme_cowplot()
+
+provziplot<-ggplot(provest_zi, aes(x=age, y=Estimate))+geom_point()+stat_smooth(method='lm') +labs(title='Provisioning rate')+theme_cowplot()
+
+provgauplot
+
+provziplot
