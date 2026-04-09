@@ -277,8 +277,8 @@ teloagedist<-telo_w%>%
   group_by(age_year)%>%
   summarise(count=n())
 
-provagedistplot<-ggplot(prov_w, aes(x=age))+geom_histogram(bins=18, alpha=0.5, colour='black')+theme_cowplot()
-teloagedistplot<-ggplot(telo_w, aes(x=age_year))+geom_histogram(bins=18, alpha=0.5, colour='black')+theme_cowplot()
+provagedistplot<-ggplot(prov_w, aes(x=age))+geom_histogram(bins=18, alpha=0.5, colour='black')+theme_cowplot()+xlab('Age (years)')
+teloagedistplot<-ggplot(telo_w, aes(x=age_year))+geom_histogram(bins=18, alpha=0.5, colour='black')+theme_cowplot()+xlab('Age (years)')
 teloagedistplot
 
 
@@ -317,7 +317,7 @@ provest_gau<-lapply(prov_byage, provestfunc)
 provmod_gau<-lapply(prov_byage, provmodelfunc)
 
 
-provest_gau<-do.call(rbind.data.frame,provest_gau )
+provest_gau<-do.call(rbind.data.frame,provest_gau)
 colnames(provest_gau)<-c('Estimate', 'p')
 provest_gau$age<-as.numeric(rownames(provest_gau))
 
@@ -331,13 +331,39 @@ provmodelfunc_zi<-function(x){
   return(model)
 }
 
-provest_zi<-lapply(prov_byage, provestfunc)  
+provest_zi<-lapply(prov_byage, provestfunc_zi)  
 
-provmod_zi<-lapply(prov_byage, provmodelfunc)
+provmod_zi<-lapply(prov_byage, provmodelfunc_zi)
 
 provest_zi<-do.call(rbind.data.frame,provest_zi )
 colnames(provest_zi)<-c('Estimate', 'p')
 provest_zi$age<-as.numeric(rownames(provest_zi))
+
+
+
+#gamma will not work because 0s not allowed. (unless +1 to all my data)
+
+prov_byage_gamma<-lapply(prov_byage, function(x){x<-x%>%mutate(w1=w1+1, 
+                                                               prate=prate+1)})
+
+provestfunc_gamma<-function(x){
+  model<-glmmTMB(w1 ~ prate, data=x, family=Gamma(), ziformula = ~0,control = glmmTMBControl(optimizer = optim , optArgs = list(method='BFGS')))
+  return(summary(model)$coefficient$cond[2,c(1,4)])
+}
+
+provmodelfunc_gamma<-function(x){
+  model<-glmmTMB(w1 ~prate, data=x, family=Gamma(), ziformula = ~0,control = glmmTMBControl(optimizer = optim , optArgs = list(method='BFGS')))
+  return(model)
+}
+
+provest_gamma<-lapply(prov_byage_gamma, provestfunc_gamma)  
+
+provmod_gamma<-lapply(prov_byage_gamma, provmodelfunc_gamma)
+
+
+provcheck_gamma<-modelchecker(provmod_gamma)
+
+#nah thats worse 
 
 
 provgauplot<-ggplot(provest_gau, aes(x=age, y=Estimate))+geom_point()+stat_smooth(method='lm') +labs(title='Provisioning rate')+theme_cowplot()
@@ -347,3 +373,17 @@ provziplot<-ggplot(provest_zi, aes(x=age, y=Estimate))+geom_point()+stat_smooth(
 provgauplot
 
 provziplot
+
+provgaucheck<-modelchecker(provmod_gau)
+
+provzicheck<-modelchecker(provmod_zi)
+
+par(mfrow=c(2,2))
+
+summary(provmod_zi[[2]])
+
+###########################
+
+
+
+

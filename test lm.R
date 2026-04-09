@@ -55,7 +55,14 @@ bodymass<-physio[,c(1,2,11,12,22,25,26,28,29,31,33,35,36,37,38)]
 # missingdf<-physio[,c('newlifespan','age_year','BodyMass',
 #                      'RightTarsus','avg_invert')]
 
+
+bodymass<-filter(bodymass, !is.na(bodymass$BodyMass))
+
+
 hist(bodymass$age_year)
+
+bodymassagedis<-ggplot(bodymass, aes(x=age_year))+geom_histogram(bins=17, colour='black', alpha=0.5)+theme_cowplot()+xlab('Age (years)')
+
 hist(bodymass$lifespan)
 
 
@@ -63,7 +70,7 @@ hist(bodymass$lifespan)
 bm<-left_join(bodymass, ars, by=c('BirdID', 'occasionyear'))
 bm$age_year[bm$age_year>=14]<-14
 
-
+par(mfrow=c(1,1))
 
 #get relative lifetime fitness 
 r<-log(0.9223668)  #value from leslie matrix from other script
@@ -174,38 +181,38 @@ plot(lrs_coeff[,1])
 ######################################
 #ages binned 
 
-bm_lrs2<-bm_lrs%>%
-  mutate(age_cat=case_when(age_year<3 ~ 'Young', 
-                           age_year>=3 & age_year<=4 ~'Prime', 
-                           age_year>=5 & age_year <=7 ~ 'PostPrime', 
-                           age_year>=8 & age_year <=12 ~ "Old", 
-                           age_year>=13 ~ " Very Old"))
-
-
-
-bmlrsbyagecat<-split(bm_lrs2, bm_lrs2$age_cat)
-
-#scale variables 
-bmlrsbyagecat <- lapply(bmlrsbyagecat, function(x) {
-  x$bodymass_z <- scale(x$BodyMass)
-  # x$w1_z<-scale(x$w1_z)
-  x$halfw_z<-scale(x$half_w)
-  return(x)
-})
+# bm_lrs2<-bm_lrs%>%
+#   mutate(age_cat=case_when(age_year<3 ~ 'Young', 
+#                            age_year>=3 & age_year<=4 ~'Prime', 
+#                            age_year>=5 & age_year <=7 ~ 'PostPrime', 
+#                            age_year>=8 & age_year <=12 ~ "Old", 
+#                            age_year>=13 ~ " Very Old"))
+# 
+# 
+# 
+# bmlrsbyagecat<-split(bm_lrs2, bm_lrs2$age_cat)
+# 
+# #scale variables 
+# bmlrsbyagecat <- lapply(bmlrsbyagecat, function(x) {
+#   x$bodymass_z <- scale(x$BodyMass)
+#   # x$w1_z<-scale(x$w1_z)
+#   x$halfw_z<-scale(x$half_w)
+#   return(x)
+# })
 
 #
-w1agecat_model<-function(x){
-  model<-glmmTMB(w1_z~bodymass_z+SexEstimate.x, data=x, family=gaussian(), 
-                 ziformula=~1)
-  return(summary(model)$coefficient$cond[2,c(1,4)])
-}
+# w1agecat_model<-function(x){
+#   model<-glmmTMB(w1_z~bodymass_z+SexEstimate.x, data=x, family=gaussian(), 
+#                  ziformula=~1)
+#   return(summary(model)$coefficient$cond[2,c(1,4)])
+# }
 
+# 
+# w1agecat_coeff<-lapply(bmlrsbyagecat, w1agecat_model)
 
-w1agecat_coeff<-lapply(bmlrsbyagecat, w1agecat_model)
-
-w1_cat<-as.data.frame(do.call(rbind,w1agecat_coeff))
-w1_cat<-c(w1_cat[5,1],w1_cat[4,1],w1_cat[3,1],w1_cat[2,1],w1_cat[1,1] )
-plot(w1_cat)
+# w1_cat<-as.data.frame(do.call(rbind,w1agecat_coeff))
+# w1_cat<-c(w1_cat[5,1],w1_cat[4,1],w1_cat[3,1],w1_cat[2,1],w1_cat[1,1] )
+# plot(w1_cat)
 
 
 #############################################
@@ -217,7 +224,7 @@ lrscat_coeff<-as.data.frame(do.call(rbind,lrs_cat_mods))
 lrscatplot<-c(lrscat_coeff[5,1],lrscat_coeff[4,1],lrscat_coeff[3,1],
               lrscat_coeff[2,1],lrscat_coeff[1,1] )
 
-plot(lrscatplot)
+# plot(lrscatplot)
 
 
 
@@ -390,64 +397,64 @@ plot(test2$age, test2$estimate)
 #trying to bin ages into 5 categories to increase sample size 
 #bin age 1-2, 3-4 as prime, 5-7 as starting decline, 8-12, and 13+ 
 
-View(bm)
-bm$age_year<-as.numeric(bm$age_year)
+# View(bm)
+# bm$age_year<-as.numeric(bm$age_year)
+# 
+# bm2<-bm%>%
+#   mutate(age_cat=case_when(age_year<3 ~ 'Young', 
+#                            age_year>=3 & age_year<=4 ~'Prime', 
+#                            age_year>=5 & age_year <=7 ~ 'PostPrime', 
+#                            age_year>=8 & age_year <=12 ~ "Old", 
+#                            age_year>=13 ~ " Very Old"))
+# 
+# bm_bycat<-split(bm2, bm2$age_cat)
+# 
+# bm_vold<-bm_bycat[[1]]
+# bm_old<-bm_bycat[[2]]
+# bm_postprime<-bm_bycat[[3]]
+# bm_prime<-bm_bycat[[4]]
+# bm_young<-bm_bycat[[5]]
 
-bm2<-bm%>%
-  mutate(age_cat=case_when(age_year<3 ~ 'Young', 
-                           age_year>=3 & age_year<=4 ~'Prime', 
-                           age_year>=5 & age_year <=7 ~ 'PostPrime', 
-                           age_year>=8 & age_year <=12 ~ "Old", 
-                           age_year>=13 ~ " Very Old"))
-
-bm_bycat<-split(bm2, bm2$age_cat)
-
-bm_vold<-bm_bycat[[1]]
-bm_old<-bm_bycat[[2]]
-bm_postprime<-bm_bycat[[3]]
-bm_prime<-bm_bycat[[4]]
-bm_young<-bm_bycat[[5]]
-
-bm_young$bodymass_z<-scale(bm_young$BodyMass)
-bm_prime$bodymass_z<-scale(bm_prime$BodyMass)
-bm_postprime$bodymass_z<-scale(bm_postprime$BodyMass)
-bm_old$bodymass_z<-scale(bm_old$BodyMass)
-bm_vold$bodymass_z<-scale(bm_vold$BodyMass)
+# bm_young$bodymass_z<-scale(bm_young$BodyMass)
+# bm_prime$bodymass_z<-scale(bm_prime$BodyMass)
+# bm_postprime$bodymass_z<-scale(bm_postprime$BodyMass)
+# bm_old$bodymass_z<-scale(bm_old$BodyMass)
+# bm_vold$bodymass_z<-scale(bm_vold$BodyMass)
 
 
 #young
-youngmod<-glm(ars~bodymass_z+SexEstimate, bm_young, family='poisson')
-summary(youngmod)
+# youngmod<-glm(ars~bodymass_z+SexEstimate, bm_young, family='poisson')
+# summary(youngmod)
 
 #0.24635 (significant)
 
 #prime
-primemod<-glm(ars~bodymass_z+SexEstimate, bm_prime, family='poisson')
-summary(primemod)
-
-#0.01094    
-
-
-postprimemod<-glm(ars~bodymass_z+SexEstimate, bm_postprime, family='poisson')
-summary(postprimemod)
-
-#0.11412    
-
-
-oldmod<-glm(ars~bodymass_z+SexEstimate, bm_old, family='poisson')
-summary(oldmod)
-
-#-0.07761
-
-voldmod<-glm(ars~bodymass_z+SexEstimate, bm_vold,family='poisson')
-summary(voldmod)
+# primemod<-glm(ars~bodymass_z+SexEstimate, bm_prime, family='poisson')
+# summary(primemod)
+# 
+# #0.01094    
+# 
+# 
+# postprimemod<-glm(ars~bodymass_z+SexEstimate, bm_postprime, family='poisson')
+# summary(postprimemod)
+# 
+# #0.11412    
+# 
+# 
+# oldmod<-glm(ars~bodymass_z+SexEstimate, bm_old, family='poisson')
+# summary(oldmod)
+# 
+# #-0.07761
+# 
+# voldmod<-glm(ars~bodymass_z+SexEstimate, bm_vold,family='poisson')
+# summary(voldmod)
 
 #0.8085   (significant)
 
-y<-c(0.24635, 0.01094,0.11412,-0.07761,0.8085)
-x<-c(1,2,3,4,5)
-
-plot(x,y)
+# y<-c(0.24635, 0.01094,0.11412,-0.07761,0.8085)
+# x<-c(1,2,3,4,5)
+# 
+# plot(x,y)
 
 
 

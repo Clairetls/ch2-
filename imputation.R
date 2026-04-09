@@ -308,7 +308,7 @@ write.csv(completed_data, 'imputed_bm.csv')
 
 library(gamlss)
 library(gratia)
-write.csv(bm_impu, 'bm_impu.csv')
+write.csv(bm_impu, 'bm_impu.csv')  #empty dataframe 
 
 
 #################################
