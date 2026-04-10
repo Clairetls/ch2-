@@ -23,14 +23,15 @@ tars_bm_complete$w1[is.na(tars_bm_complete$w1)]<-0 #assign 0 to birds with NA fi
 
 
 tarsbm_byiter<-split(tars_bm_complete, tars_bm_complete$.imp)
+View(tarsbm_byiter)
 
-
-tarsbm_byiter[[1]]%>%
-  group_by(age_year)%>%
-  summarize(count=n())
+# tarsbm_byiter[[1]]%>%
+#   group_by(age_year)%>%
+#   summarize(count=n())
 
 
 iterbyage<-lapply(tarsbm_byiter,function(x){split(x,x$age_year)})
+View(iterbyage)
 
 noimpu<-iterbyage[[1]]
 tarsiter1<-iterbyage[[2]]
@@ -58,6 +59,8 @@ tarsiter4<-lapply(tarsiter4, function(x){x<-x%>%mutate(w1_z = scale(w1))})
 tarsiter5<-lapply(tarsiter5, function(x){x<-x%>%mutate(w1_z = scale(w1))})
 
 
+
+#maybe try both gaussian and gamma and compare? 
 
 # summary(tarsiter1[[1]]$w1)
 
@@ -91,7 +94,6 @@ tars2_mods<-lapply(tarsiter2, tarslm_getmod)
 tars3_est<-lapply(tarsiter3, tarslm_getest)  
 tars3_mods<-lapply(tarsiter3, tarslm_getmod)
 
-View(tars3_est)
 #iter 4 
 tars4_est<-lapply(tarsiter4, tarslm_getest)  
 tars4_mods<-lapply(tarsiter4, tarslm_getmod)
@@ -125,7 +127,7 @@ tarsmodelperage<-lapply(c(1:15), function(x){
 }
 )
 
-View(tarsmodelperage)
+# View(tarsmodelperage)
 
 tarsestperage<-lapply(c(1:15), function(x){
   tarsest<-list(
@@ -148,7 +150,7 @@ tarsestperage<-lapply(c(1:15), function(x){
 
 source('modelchecker code.R')
 
-dfage1<-modelchecker(tarsmodelperage[[1]])
+# dfage1<-modelchecker(tarsmodelperage[[1]])
 
 
 
@@ -182,17 +184,19 @@ tarsselection<-ggplot(tarscoeffperagedf, aes(x=age, y=Estimate))+
 
 tarsselection
 
-thing<-summary(model.avg(tarsmodelperage[[1]]))
-b<-as.data.frame(as_tibble_row(thing$coefmat.full["cond(RightTarsus)",]))
+# thing<-summary(model.avg(tarsmodelperage[[1]]))
+# b<-as.data.frame(as_tibble_row(thing$coefmat.full["cond(RightTarsus)",]))
 
 
 # tarsmodelperage<-lapply(tarsmodelperage, function(x){as.mira(x)})
 
-mice::pool(tarsmodelperage[[1]])
+# mice::pool(tarsmodelperage[[1]])
 
 #can do as.mira(), make list of model fits 
 #as.mira(list of model fits)
 #pool(mira object)
+
+write_rds(tarsmodelperage, 'tarsmodperage.rds')
 
 #######################################################
 
@@ -289,6 +293,7 @@ bmestperage_gau<-lapply(c(1:15), function(x){
 }
 )
 
+
 bmmodperage_gau<-lapply(c(1:15), function(x){
   bm<-list(
     bm1mod_gaus[[x]], 
@@ -301,7 +306,7 @@ bmmodperage_gau<-lapply(c(1:15), function(x){
 }
 )
 
-View(tarsmodelperage)
+
 
 
 
@@ -328,9 +333,106 @@ bm4mod_zi<-lapply(bmiter4, bmmod_zi)
 bm5est_zi<-lapply(bmiter5, bmest_zi)  
 bm5mod_zi<-lapply(bmiter5, bmmod_zi)
 
+
+#compile estimates
+bmestperage_zi<-lapply(c(1:15), function(x){
+  bmest_zi<-list(
+    bm1est_zi[[x]], 
+    bm2est_zi[[x]], 
+    bm3est_zi[[x]], 
+    bm4est_zi[[x]], 
+    bm5est_zi[[x]]
+  )
+  bmest_zi<-do.call(rbind.data.frame, bmest_zi)
+  colnames(bmest_zi)<-c('Estimate','p')
+  return(bmest_zi)
+}
+)
+
+#compile models 
+bmmodperage_zi<-lapply(c(1:15), function(x){
+  bmmod_zi<-list(
+    bm1mod_zi[[x]], 
+    bm2mod_zi[[x]], 
+    bm3mod_zi[[x]], 
+    bm4mod_zi[[x]], 
+    bm5mod_zi[[x]]
+  )
+  return(bmmod_zi)
+}
+)
+
 #############################################
 
 #model checker
+
+bmcheckperage_gau<-lapply(bmmodperage_gau ,function(x){modelchecker(x)})
+
+
+bmcheckperage_zi<-lapply(bmmodperage_zi, function(x){modelchecker(x)})
+
+
+bmcheckgau_df<-do.call(rbind.data.frame, bmcheckperage_gau)
+bmcheckzi_df<-do.call(rbind.data.frame, bmcheckperage_zi)
+
+####
+#modelavg
+
+bmavgperage_gau<-lapply(bmmodperage_gau, function(x){model.avg(x)})
+bmavgperage_zi<-lapply(bmmodperage_zi, function(x){model.avg(x)})   #i think the zigamma performs better here. 
+
+# View(bmcheckgau_df)
+
+
+# View(bmcheckzi_df)
+
+bmestavgperage_gau<-lapply(bmavgperage_gau, 
+                        function(x){modsum<-summary(x)
+                        one<-as.data.frame(as_tibble_row(modsum$coefmat.full["cond(BodyMass_z)",]))
+                        return(one)})
+
+
+bmestavgperage_gau_df<-do.call(rbind.data.frame, bmestavgperage_gau)
+bmestavgperage_gau_df$age<-as.numeric(rownames(bmestavgperage_gau_df))
+
+View(bmestavgperage_gau_df)
+
+# tarscoeffperagedf$ymin<-tarscoeffperagedf$Estimate-1.96*tarscoeffperagedf$`Std. Error`
+# tarscoeffperagedf$ymax<-tarscoeffperagedf$Estimate+1.96*tarscoeffperagedf$`Std. Error`
+
+bmselection_gau<-ggplot(bmestavgperage_gau_df, aes(x=age, y=Estimate))+
+  stat_smooth(method='lm')+geom_point()+
+  geom_errorbar(aes(ymin = (Estimate-`Std. Error`), ymax=(Estimate+`Std. Error`)), alpha=0.3)+xlab('Age (years)')+theme_cowplot()
+
+bmselection_gau
+
+#############################
+#zi
+
+
+
+bmestavgperage_zi<-lapply(bmavgperage_zi, 
+                           function(x){modsum<-summary(x)
+                           one<-as.data.frame(as_tibble_row(modsum$coefmat.full["cond(BodyMass)",]))
+                           return(one)})
+
+
+bmestavgperage_zi_df<-do.call(rbind.data.frame, bmestavgperage_zi)
+bmestavgperage_zi_df$age<-as.numeric(rownames(bmestavgperage_zi_df))
+
+View(bmestavgperage_zi_df)
+
+# tarscoeffperagedf$ymin<-tarscoeffperagedf$Estimate-1.96*tarscoeffperagedf$`Std. Error`
+# tarscoeffperagedf$ymax<-tarscoeffperagedf$Estimate+1.96*tarscoeffperagedf$`Std. Error`
+
+bmselection_zi<-ggplot(bmestavgperage_zi_df, aes(x=age, y=Estimate))+
+  stat_smooth(method='lm')+geom_point()+
+  geom_errorbar(aes(ymin = (Estimate-`Std. Error`), ymax=(Estimate+`Std. Error`)), alpha=0.3)+xlab('Age (years)') +theme_cowplot()
+
+bmselection_zi
+
+#############################################
+
 
 
 

@@ -217,7 +217,7 @@ View(t_coeff)
 
 
 library(cowplot)
-ggplot(t_coeff, aes(x=age, y=Estimate))+geom_point()+stat_smooth(method='lm') +labs(title='Telomere Length')+theme_cowplot()
+telogausplot<-ggplot(t_coeff, aes(x=age, y=Estimate))+geom_point()+stat_smooth(method='lm') +labs(title='Telomere Length')+theme_cowplot()
 
 telomod2plot<-ggplot(telo_zigammaest, aes(x=age, y=Estimate))+geom_point()+stat_smooth(method='lm') +labs(title='Telomere Length')+theme_cowplot()
 

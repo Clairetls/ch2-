@@ -69,8 +69,10 @@ hist(bodymass$lifespan)
 # bodymass$bodymass_z<-scale(bodymass$BodyMass)
 bm<-left_join(bodymass, ars, by=c('BirdID', 'occasionyear'))
 bm$age_year[bm$age_year>=14]<-14
+bm$age_year[bm$age_year==12| bm$age_year==13]<-'12-13'
 
-par(mfrow=c(1,1))
+
+# par(mfrow=c(1,1))
 
 #get relative lifetime fitness 
 r<-log(0.9223668)  #value from leslie matrix from other script
@@ -105,7 +107,7 @@ write.csv(lifetime_w, "lifetimefitness.csv")
 #merge relative fitness data with body mass dataframe 
 
 bm_lrs<-left_join(bm, lifetime_w, by='BirdID')
-bm_lrs<-left_join(bm_lrs, lrs, by="BirdID")
+# bm_lrs<-left_join(bm_lrs, lrs, by="BirdID")
 
 ##
 
@@ -117,8 +119,8 @@ library(MCMCglmm)
   
 
 bm_lrs$w1[is.na(bm_lrs$w1)]<-0
-bm_lrs$half_w[is.na(bm_lrs$half_w)]<-0
-bm_lrs$lrs[is.na(bm_lrs$lrs)]<-0
+# bm_lrs$half_w[is.na(bm_lrs$half_w)]<-0
+# bm_lrs$lrs[is.na(bm_lrs$lrs)]<-0
 
 
 
@@ -126,56 +128,104 @@ bmlrsbyage<-split(bm_lrs, bm_lrs$age_year)
 
 
 bmlrsbyage <- lapply(bmlrsbyage, function(x) {
-  x$bodymass_z <- scale(x$BodyMass)
-  x$w1_z<-scale(x$w1_z)
-  x$halfw_z<-scale(x$half_w)
+  x$bodymass_z <- scale(as.numeric(x$BodyMass))
+  x$w1_z<-scale(as.numeric(x$w1))
   return(x)
 })
 
 
-bm_w1_model<-function(x){
-  model<-glmmTMB(w1_z~bodymass_z+SexEstimate.x, data=x, family=gaussian(), 
-            ziformula=~1)
+bmobs_gausest<-function(x){
+  model<-glmmTMB(w1_z~bodymass_z, data=x, family=gaussian(), ziformula=~1)
   return(summary(model)$coefficient$cond[2,c(1,4)])
 }
 
 
-bmw1_coeff<-lapply(bmlrsbyage, bm_w1_model)
 
-w1<-as.data.frame(do.call(rbind,bmw1_coeff))
-plot(w1)
+bmobs_gausmod<-function(x){
+  model<-glmmTMB(w1_z~bodymass_z, data=x, family=gaussian(), ziformula=~1)
+  return(model)
+}
+
+#######
+# zigamma
+bmobs_ziest<-function(x){
+  model<-glmmTMB(w1~BodyMass, data=x, family=ziGamma(), ziformula=~., control=glmmTMBControl(optimizer = optim , optArgs = list(method='BFGS')))
+  return(summary(model)$coefficient$cond[2,c(1,4)])
+}
+
+
+bmobs_zimod<-function(x){
+  model<-glmmTMB(w1~BodyMass, data=x, family=ziGamma(), ziformula=~., control=glmmTMBControl(optimizer = optim , optArgs = list(method='BFGS')))
+  return(model)
+}
+
+
+bmobsgaus_est<-lapply(bmlrsbyage, bmobs_gausest)
+bmobsgaus_mod<-lapply(bmlrsbyage, bmobs_gausmod)
+
+
+bmobszi_est<-lapply(bmlrsbyage, bmobs_ziest)
+bmobszi_mod<-lapply(bmlrsbyage, bmobs_zimod)
+
+
+bmobs_gauestdf<-do.call(rbind.data.frame,bmobsgaus_est)
+colnames(bmobs_gauestdf)<-c('Estimate', 'p')
+bmobs_gauestdf$age<-as.numeric(rownames(bmobs_gauestdf))
+
+bmobs_ziestdf<-do.call(rbind.data.frame,bmobszi_est)
+colnames(bmobs_ziestdf)<-c('Estimate', 'p')
+bmobs_ziestdf$age<-as.numeric(rownames(bmobs_ziestdf))
+
+
+
+bmobs_gauplot<-ggplot(bmobs_gauestdf, aes(x=age, y=Estimate))+geom_point()+
+  stat_smooth(method='lm') +labs(title='Body Mass')+theme_cowplot()+xlab('Age (years)')
+
+bmobs_ziplot<-ggplot(bmobs_ziestdf, aes(x=age, y=Estimate))+geom_point()+
+  stat_smooth(method='lm') +labs(title='Body Mass')+theme_cowplot()+xlab('Age (years)')
+
+bmobs_gauplot
+bmobs_ziplot
+
+par(mfrow=c(2,2))
+
+bmobsgaus_check<-modelchecker(bmobsgaus_mod)
+bmobszi_check<-modelchecker(bmobszi_mod)
+
+View(bmobsgaus_check)
+View(bmobszi_check)
 
 #############################################
 #half w 
 
-bm_halfw_model<-function(x){
-  model<-glmmTMB(halfw_z~bodymass_z+SexEstimate.x, data=x, family=gaussian(), 
-                 ziformula=~1)
-  return(summary(model)$coefficient$cond[2,c(1,4)])
-}
-
-
-bm_halfw_coeff<-lapply(bmlrsbyage, bm_halfw_model)
-
-halfw<-as.data.frame(do.call(rbind,bm_halfw_coeff))
-plot(halfw)
+# bm_halfw_model<-function(x){
+#   model<-glmmTMB(halfw_z~bodymass_z+SexEstimate.x, data=x, family=gaussian(), 
+#                  ziformula=~1)
+#   return(summary(model)$coefficient$cond[2,c(1,4)])
+# }
+# 
+# 
+# bm_halfw_coeff<-lapply(bmlrsbyage, bm_halfw_model)
+# 
+# halfw<-as.data.frame(do.call(rbind,bm_halfw_coeff))
+# plot(halfw)
 
 
 ###########################################
 #lrs 
-lifetimerepro<-lrs
-
-bmlrs_model<-function(x){
-  model<-glmmTMB(lrs~bodymass_z+SexEstimate.x, data=x, family="poisson", 
-                 ziformula=~1)
-  return(summary(model)$coefficient$cond[2,c(1,4)])
-}
-
-
-bmlrs_coeff<-lapply(bmlrsbyage, bmlrs_model)
-
-lrs_coeff<-as.data.frame(do.call(rbind,bmlrs_coeff))
-plot(lrs_coeff[,1])
+# lifetimerepro<-lrs
+# 
+# bmlrs_model<-function(x){
+#   model<-glmmTMB(lrs~bodymass_z+SexEstimate.x, data=x, family="poisson", 
+#                  ziformula=~1)
+#   return(summary(model)$coefficient$cond[2,c(1,4)])
+# }
+# 
+# 
+# bmlrs_coeff<-lapply(bmlrsbyage, bmlrs_model)
+# 
+# lrs_coeff<-as.data.frame(do.call(rbind,bmlrs_coeff))
+# plot(lrs_coeff[,1])
 
 
 ######################################
