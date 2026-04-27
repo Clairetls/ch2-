@@ -21,22 +21,22 @@ physio<-physio[,-c(1)]
 #--------original model-----------
 
 #get nr birds with high sample size 
-samplesize<-physio%>%   
-  filter(!is.na(BodyMass))%>%
-  group_by(BirdID)%>%
-  summarize(obs=n())
-
-manyobs<-samplesize%>%
-  filter(obs>3)
-
-
-#vector of bird id with multiple obs 
-# manyobs<-manyobs$BirdID
-
-
-#testing on a smaller sample size 
-cv_samples<-filter(bm_impu,  bm_impu$BirdID %in% manyobs)
-
+# samplesize<-physio%>%   
+#   filter(!is.na(BodyMass))%>%
+#   group_by(BirdID)%>%
+#   summarize(obs=n())
+# 
+# manyobs<-samplesize%>%
+#   filter(obs>3)
+# 
+# 
+# #vector of bird id with multiple obs 
+# # manyobs<-manyobs$BirdID
+# 
+# 
+# #testing on a smaller sample size 
+# cv_samples<-filter(bm_impu,  bm_impu$BirdID %in% manyobs)
+# 
 
 #test on the full sample size 
 cv_samples2<-bm_impu
@@ -45,10 +45,10 @@ cv_samples2<-bm_impu
 #50 points maybe would be a good 
 #make function 
 #for i in bird ID, pick bm not NA, remove that from dataset 
-set.seed(1)
-cv_samples$rownr<-row.names(cv_samples)
-forfiltering<-filter(cv_samples, !is.na(cv_samples$BodyMass))
-to_remove<-forfiltering[sample(1:nrow(forfiltering), 50,replace=F),]#dataset of rows to remove, remove rows one by one? 
+# set.seed(1)
+# cv_samples$rownr<-row.names(cv_samples)
+# forfiltering<-filter(cv_samples, !is.na(cv_samples$BodyMass))
+# to_remove<-forfiltering[sample(1:nrow(forfiltering), 50,replace=F),]#dataset of rows to remove, remove rows one by one? 
 
 
 #give x is to_remove$rownr 
@@ -58,15 +58,16 @@ to_remove<-forfiltering[sample(1:nrow(forfiltering), 50,replace=F),]#dataset of 
 #redo over the whole dataset 
 cv_samples2$rownr<-as.numeric(row.names(cv_samples2))
 cv_samples2_complete<-filter(cv_samples2, !is.na(cv_samples2$BodyMass))
+set.seed(1)
 sampledf2<-cv_samples2_complete[sample(1:nrow(cv_samples2_complete), 50,replace=F),]
 sampledf3<-cv_samples2_complete[sample(1:nrow(cv_samples2_complete), 50,replace=F),]
 sampledf4<-cv_samples2_complete[sample(1:nrow(cv_samples2_complete), 50,replace=F),]
-
+sampledf5<-cv_samples2_complete[sample(1:nrow(cv_samples2_complete), 50,replace=F),]
 cv_samples2$SexEstimate<-as.factor(cv_samples2$SexEstimate)
 
 
 #make predictor matrix for imputation 
-cv_pred<-make.predictorMatrix(cv_samples)
+cv_pred<-make.predictorMatrix(cv_samples2)
 
 exclude <- c('birthyear', 'Observer', 'occasionyear')
 
@@ -98,13 +99,13 @@ cv_method <- c(
 
 
 
-cv_func<-function(x){
-  cv_samples[c(x),'BodyMass']<-NA 
-  impu <- mice(cv_samples, method = cv_method, predictorMatrix = cv_pred, m = 5) #needs imputation.r to run 
-  completeimpu<-complete(impu, action='long', include=T, all=T)
-  onepoint<-filter(completeimpu, completeimpu$rownr==x)  #extract data from just row number 
-  return(onepoint)
-}
+# cv_func<-function(x){
+#   cv_samples[c(x),'BodyMass']<-NA 
+#   impu <- mice(cv_samples, method = cv_method, predictorMatrix = cv_pred, m = 5) #needs imputation.r to run 
+#   completeimpu<-complete(impu, action='long', include=T, all=T)
+#   onepoint<-filter(completeimpu, completeimpu$rownr==x)  #extract data from just row number 
+#   return(onepoint)
+# }
 
 
 
@@ -122,40 +123,46 @@ cv_func2<-function(x){
 #plot the graph of imputed (mean and error bars) vs original 
 
 
-idk<-list()
-
-idk<-lapply(to_remove$rownr, FUN = cv_func)  #should i use lapply instead?? 
+# idk<-list()
+# 
+# idk<-lapply(to_remove$rownr, FUN = cv_func)  #should i use lapply instead?? 
 # assign names
 #melt
 
 #bigger df 
-cv2<-lapply(sampledf2$rownr, FUN=cv_func2)
+cv2<-lapply(sampledf2$rownr, FUN = cv_func2)
 cv3<-lapply(sampledf3$rownr, FUN = cv_func2)
+cv4<-lapply(sampledf4$rownr, FUN = cv_func2)
+cv5<-lapply(sampledf5$rownr, FUN = cv_func2)
 
-cv_points<-do.call(rbind.data.frame, idk)
+# cv_points<-do.call(rbind.data.frame, idk)
 
 #add original observation to NA 
 # to_remove$.id<-to_remove$rownr
 # to_remove$.imp<-0
 
-originalpoints<-to_remove[,c('BirdID', 'BodyMass', 'rownr')]
+# originalpoints<-to_remove[,c('BirdID', 'BodyMass', 'rownr')]
+# 
+# cv_points<-filter(cv_points, cv_points$.imp !=0)
+# # cv_points<-rbind(cv_points, to_remove)%>%arrange(BirdID, .imp)
+# 
+# cv_points<-left_join(cv_points, originalpoints, by=c("BirdID",'rownr'))
+# 
+# #then correlate 
+# ggplot(cv_points, aes(x=BodyMass.y, y=BodyMass.x))+geom_point()+stat_smooth(method='lm')
+# 
+# cor(cv_points$BodyMass.x, cv_points$BodyMass.y)
+# aaa<-lm(BodyMass.x~BodyMass.y, cv_points)
+# summary(aaa)
 
-cv_points<-filter(cv_points, cv_points$.imp !=0)
-# cv_points<-rbind(cv_points, to_remove)%>%arrange(BirdID, .imp)
 
-cv_points<-left_join(cv_points, originalpoints, by=c("BirdID",'rownr'))
-
-#then correlate 
-ggplot(cv_points, aes(x=BodyMass.y, y=BodyMass.x))+geom_point()+stat_smooth(method='lm')
-
-cor(cv_points$BodyMass.x, cv_points$BodyMass.y)
-aaa<-lm(BodyMass.x~BodyMass.y, cv_points)
-summary(aaa)
 #######################################
 #bigger df 
 
 cv_points2<-do.call(rbind.data.frame, cv2)
 cv_pts3<-do.call(rbind.data.frame, cv3)
+cv_pts4<-do.call(rbind.data.frame, cv4)
+cv_pts5<-do.call(rbind.data.frame, cv5)
 
 #add original observation to NA 
 # to_remove$.id<-to_remove$rownr
@@ -168,27 +175,68 @@ colnames(originalpoints2)[colnames(originalpoints2)=='BodyMass']<-'Original_BM'
 originalpoints3<-sampledf3[,c('BirdID', 'BodyMass', 'rownr')]
 colnames(originalpoints3)[colnames(originalpoints3)=='BodyMass']<-'Original_BM'
 
+originalpoints4<-sampledf4[,c('BirdID', 'BodyMass', 'rownr')]
+colnames(originalpoints4)[colnames(originalpoints4)=='BodyMass']<-'Original_BM'
+
+originalpoints5<-sampledf5[,c('BirdID', 'BodyMass', 'rownr')]
+colnames(originalpoints5)[colnames(originalpoints5)=='BodyMass']<-'Original_BM'
+
+
 cv_points2<-filter(cv_points2, cv_points2$.imp !=0)
 # cv_points<-rbind(cv_points, to_remove)%>%arrange(BirdID, .imp)
 
 cv_pts3<-filter(cv_pts3, cv_pts3$.imp !=0)
 
+cv_pts4<-filter(cv_pts4, cv_pts4$.imp !=0)
+
+cv_pts5<-filter(cv_pts5, cv_pts5$.imp !=0)
+
+##
 
 cv_points2<-left_join(cv_points2, originalpoints2, by=c("BirdID",'rownr'))
 
 cv_pts3<-left_join(cv_pts3, originalpoints3, by=c('BirdID','rownr'))
 
+cv_pts4<-left_join(cv_pts4, originalpoints4, by=c('BirdID','rownr'))
+
+cv_pts5<-left_join(cv_pts5, originalpoints5, by=c('BirdID','rownr'))
+
+
 #then correlate 
-ggplot(cv_points2, aes(x=Original_BM, y=BodyMass))+geom_point()+stat_smooth(method='lm')
+cv2plot<-ggplot(cv_points2, aes(x=Original_BM, y=BodyMass))+geom_point()+stat_smooth(method='lm')
 
-cor(cv_points2$BodyMass, cv_points2$Original_BM)
+cor(cv_points2$BodyMass, cv_points2$Original_BM)  #0.4386647
 getr2<-lm(BodyMass~Original_BM, cv_points2)
+summary(getr2)
 
+cv3plot<-ggplot(cv_pts3, aes(x=Original_BM, y=BodyMass))+geom_point()+stat_smooth(method='lm')
 
-ggplot(cv_pts3, aes(x=Original_BM, y=BodyMass))+geom_point()+stat_smooth(method='lm')
-
-cor(cv_pts3$BodyMass, cv_pts3$Original_BM)
+cor(cv_pts3$BodyMass, cv_pts3$Original_BM) #0.4550385
 getr3<-lm(BodyMass~Original_BM, cv_pts3)
+
+
+
+cv4plot<-ggplot(cv_pts4, aes(x=Original_BM, y=BodyMass))+geom_point()+stat_smooth(method='lm')
+
+cor(cv_pts4$BodyMass, cv_pts4$Original_BM) #0.5225447
+getr4<-lm(BodyMass~Original_BM, cv_pts4)
+
+
+cv5plot<-ggplot(cv_pts5, aes(x=Original_BM, y=BodyMass))+geom_point()+stat_smooth(method='lm')
+ 
+cor(cv_pts5$BodyMass, cv_pts5$Original_BM) #0.4435468
+getr5<-lm(BodyMass~Original_BM, cv_pts5)
+
+
+library(ggpubr)
+
+ggarrange(cv2plot, cv3plot, cv4plot, cv5plot)
+
+summary(getr2)
+summary(getr3)
+summary(getr4)
+summary(getr5)
+
 
 
 ############ i can probably streamline this.. ###############################

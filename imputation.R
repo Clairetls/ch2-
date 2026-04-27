@@ -33,7 +33,6 @@ WHERE (((tblCatches.EggPresent)=-1));
 
 phys_clean<-filter(physio, physio$CatchID %!in% eggbound$CatchID)
 
-
 bodymass<-phys_clean[,c(1,2,3,11,12,22,25,26,28,29,31,33,35,36,37,38)]
 
 lastseen<-read.csv('lastseen.csv', sep=';', stringsAsFactors = F)
@@ -181,7 +180,7 @@ bm_impu<-bm_clean%>%
   select(BirdID, birthyear,occasionyear, age_year, newlifespan, newFPID, newstat, BodyMass, RightTarsus, 
          Observer, SexEstimate, CatchTime_mins, new_bug)
 
- 
+ View(bm_impu)
 
 #view missingness 
 md.pattern(bm_impu, rotate.names = T)
@@ -251,7 +250,7 @@ bm_impu$SexEstimate<-as.factor(bm_impu$SexEstimate)
 #imputation 
 imp <- mice(bm_impu, method = bm_method, predictorMatrix = bm_pred, m = 5)
 
-imp2 <- mice(bm_impu, method = bm_method, predictorMatrix = bm_pred, m = 20)
+imp2 <- mice(bm_impu, method = bm_method, predictorMatrix = bm_pred, m = 10)
 
 # str(bm_impu)
 
@@ -266,6 +265,9 @@ imp2 <- mice(bm_impu, method = bm_method, predictorMatrix = bm_pred, m = 20)
 #this pulls the iterations of the imputation 
 imputed_data <- complete(imp, c(1:5))
 
+imputed_data_10iter<-complete(imp2, c(1:10))
+
+View(imputed_data_10iter)
 #check missingness pattern of data 
 md.pattern(imputed_data, rotate.names = T)
 
@@ -276,6 +278,10 @@ completed_data<-complete(imp, action='long', include=T, all=T)
 #this pulls all of the dataframes, 0 is original data 
 completed_data$.imp<-as.factor(completed_data$.imp)
 
+
+bmimpu10<-complete(imp2, action='long', include=T, all=T)
+bmimpu10$.imp<-as.factor(bmimpu10$.imp)
+View(bmimpu10)
 
 #visual inspection of imputation 
 ggplot(completed_data, aes(x=BodyMass, colour=.imp)) + geom_density()
@@ -301,7 +307,7 @@ xyplot(imp, BodyMass ~ ps | as.factor(.imp),
 
 
 write.csv(completed_data, 'imputed_bm.csv')
-
+write.csv(bmimpu10, 'imputed_bm_10.csv')
 
 #############
 
@@ -351,5 +357,7 @@ hist(lifespan$newlifespan, breaks = 20, xlab = 'Count', ylab = 'lifespan (days)'
 title('Distribution of lifespan')
 ggplot(lifespan, aes(x=newlifespan))+geom_histogram(bins = 20, colour='black', fill='grey')+
   theme_cowplot()+xlab('Lifespan (days)')
+
+
 
 

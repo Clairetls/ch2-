@@ -5,9 +5,11 @@ library(mice)
 
 #read imputed dataset 
 tars_bm_complete<-read.csv('imputed_bm.csv') 
+tars_bm_10iter<-read.csv('imputed_bm_10.csv')
 fitnessdf<-read.csv('lifetimefitness.csv')
 fitnessdf<-fitnessdf[,-c(1)]
 tars_bm_complete<-tars_bm_complete[,-c(1)]
+tars_bm_10iter<-tars_bm_10iter[,-c(1)]
 
 
 #there is no age 0 because fledgling measurements removed. 
@@ -16,14 +18,19 @@ tars_bm_complete<-tars_bm_complete[,-c(1)]
 View(fitnessdf)
 
 tars_bm_complete<-left_join(tars_bm_complete, fitnessdf, by='BirdID')
+tars_bm_10iter<-left_join(tars_bm_10iter, fitnessdf, by='BirdID')
+
 
 
 tars_bm_complete$age_year[tars_bm_complete$age_year>15]<-15
 tars_bm_complete$w1[is.na(tars_bm_complete$w1)]<-0 #assign 0 to birds with NA fitness 
 
 
+tars_bm_10iter$age_year[tars_bm_10iter$age_year>15]<-15
+tars_bm_10iter$w1[is.na(tars_bm_10iter$w1)]<-0 #assign 0 to birds with NA fitness 
+
 tarsbm_byiter<-split(tars_bm_complete, tars_bm_complete$.imp)
-View(tarsbm_byiter)
+tarsbm10_byiter<-split(tars_bm_10iter, tars_bm_10iter$.imp)
 
 # tarsbm_byiter[[1]]%>%
 #   group_by(age_year)%>%
@@ -31,7 +38,12 @@ View(tarsbm_byiter)
 
 
 iterbyage<-lapply(tarsbm_byiter,function(x){split(x,x$age_year)})
-View(iterbyage)
+
+iter10byage<-lapply(tarsbm10_byiter,function(x){split(x,x$age_year)})
+
+iter10byage<-iter10byage[-1]
+
+# View(iterbyage)
 
 noimpu<-iterbyage[[1]]
 tarsiter1<-iterbyage[[2]]
@@ -39,6 +51,22 @@ tarsiter2<-iterbyage[[3]]
 tarsiter3<-iterbyage[[4]]
 tarsiter4<-iterbyage[[5]]
 tarsiter5<-iterbyage[[6]]
+
+
+
+
+tars10iter1<-iter10byage[[2]]
+tars10iter2<-iter10byage[[3]]
+tars10iter3<-iter10byage[[4]]
+tars10iter4<-iter10byage[[5]]
+tars10iter5<-iter10byage[[6]]
+tars10iter6<-iter10byage[[7]]
+tars10iter7<-iter10byage[[8]]
+tars10iter8<-iter10byage[[9]]
+tars10iter9<-iter10byage[[10]]
+tars10iter10<-iter10byage[[11]]
+
+
 
 
 #scale right tarsus per df 
@@ -60,6 +88,14 @@ tarsiter5<-lapply(tarsiter5, function(x){x<-x%>%mutate(w1_z = scale(w1))})
 
 
 
+
+
+
+
+
+
+
+
 #maybe try both gaussian and gamma and compare? 
 
 # summary(tarsiter1[[1]]$w1)
@@ -77,6 +113,13 @@ tarslm_getmod<-function(x){
 }
 
 
+#list per iterations of models per age 
+tarsrep10mods<-lapply(iter10byage, function(x){lapply(x, tarslm_getmod)})
+
+tarsrep10est<-lapply(iter10byage, function(x){lapply(x, tarslm_getest)})
+
+
+View(tarsrep10mods)
  # m1<-glmmTMB(w1~RightTarsus, data=tarsiter1[[1]], family=ziGamma(), ziformula=~1, control = glmmTMBControl(optimizer = optim , optArgs = list(method='BFGS')))
  # summary(m1)$coefficient$cond[2,c(1,4)]
 library(DHARMa)
@@ -106,11 +149,8 @@ tars5_mods<-lapply(tarsiter5, tarslm_getmod)
 
 
 
-
-
 #make list of same age per iteration 
-#goddamn this is so annoying 
-#fucking hell 
+
 
 # tarsyr0<-list(tars1_mods[[1]],tars2_mods[[1]],tars3_mods[[1]],tars4_mods[[1]], tars5_mods[[1]])
 
@@ -126,6 +166,24 @@ tarsmodelperage<-lapply(c(1:15), function(x){
   return(tars)
 }
 )
+
+
+
+# for(i in 1:15){
+#   oneagemods<-list()
+#   for(n in 1:10){
+#     onemod<-tarsrep10mods[[n]][[i]]
+#     oneagemods[n]<-onemod
+#   }
+#   tarsperagemods10[i]<-oneagemods
+# }
+
+
+
+tarsmod10_byage<-purrr::transpose(tarsrep10mods)
+
+#for i in list1-10
+#take the first item of all 
 
 # View(tarsmodelperage)
 
@@ -158,11 +216,19 @@ modelcheckperage<-lapply(tarsmodelperage ,function(x){modelchecker(x)})
 
 View(modelcheckperage[[2]])
 
+modelcheck_tars10<-lapply(tarsmod10_byage, function(x){modelchecker(x)})
+
+View(modelcheck_tars10[[1]])
+# modelchecker_10iter<-lapply()
+  
+
 
 # View(tarsmodelperage[[1]])
 #use model averaging in mumin to combine estimates 
 
 modelavgperage<-lapply(tarsmodelperage, function(x){model.avg(x)})
+
+tarsmodavgperage_10<-lapply(tarsmod10_byage, function(x){model.avg(x)})
 
 
 tarscoeffperage<-lapply(modelavgperage, 
@@ -184,6 +250,31 @@ tarsselection<-ggplot(tarscoeffperagedf, aes(x=age, y=Estimate))+
 
 tarsselection
 
+#################
+#10 iters 
+tars10_coeffperage<-lapply(tarsmodavgperage_10, 
+                        function(x){modsum<-summary(x)
+                        one<-as.data.frame(as_tibble_row(modsum$coefmat.full["cond(RightTarsus)",]))
+                        return(one)})
+
+
+tars10coeffperagedf<-do.call(rbind.data.frame, tars10_coeffperage)
+tars10coeffperagedf$age<-as.numeric(rownames(tars10coeffperagedf))
+tars10coeffperagedf<-tars10coeffperagedf%>%
+  mutate(pval_lab= case_when(`Pr(>|z|)`<0.05 ~ '**', 
+                             `Pr(>|z|)`>0.05 ~ ''))
+
+write.csv(tars10coeffperagedf, 'tars10coeffperagedf.csv')
+tars10coeffperagedf$ymin<-tars10coeffperagedf$Estimate-1.96*tars10coeffperagedf$`Std. Error`
+tars10coeffperagedf$ymax<-tars10coeffperagedf$Estimate+1.96*tars10coeffperagedf$`Std. Error`
+
+tarsselection_10iter<-ggplot(tars10coeffperagedf, aes(x=age, y=Estimate))+
+  stat_smooth(method='lm')+geom_point()+  geom_text(aes(label=pval_lab), vjust= -10)+
+  geom_errorbar(aes(ymin = (Estimate-`Std. Error`), ymax=(Estimate+`Std. Error`)), alpha=0.3)+
+  theme_cowplot()+xlab('Age (years)')
+
+tarsselection_10iter
+
 # thing<-summary(model.avg(tarsmodelperage[[1]]))
 # b<-as.data.frame(as_tibble_row(thing$coefmat.full["cond(RightTarsus)",]))
 
@@ -197,6 +288,7 @@ tarsselection
 #pool(mira object)
 
 write_rds(tarsmodelperage, 'tarsmodperage.rds')
+write_rds(tarsmodavgperage_10, 'tarsmodavgperage_10.rds')
 
 #######################################################
 
@@ -210,6 +302,10 @@ bmiter2<-iterbyage[[3]]
 bmiter3<-iterbyage[[4]]
 bmiter4<-iterbyage[[5]]
 bmiter5<-iterbyage[[6]]
+#####################
+
+
+
 
 #scale bm 
 bmiter1<-lapply(bmiter1, function(x){x<-x%>%mutate(BodyMass_z = scale(BodyMass))})
@@ -279,6 +375,14 @@ bm5est_gaus<-lapply(bmiter5, bmest_gaus)
 bm5mod_gaus<-lapply(bmiter5, bmmod_gaus)
 
 
+
+
+
+# tarsrep10est<-lapply(iter10byage, function(x){lapply(x, tarslm_getest)})
+
+
+
+
 bmestperage_gau<-lapply(c(1:15), function(x){
   bmest_gau<-list(
     bm1est_gaus[[x]], 
@@ -334,6 +438,12 @@ bm5est_zi<-lapply(bmiter5, bmest_zi)
 bm5mod_zi<-lapply(bmiter5, bmmod_zi)
 
 
+
+#10iterations
+bm_rep10mods<-lapply(iter10byage, function(x){lapply(x, bmmod_zi)})
+
+
+
 #compile estimates
 bmestperage_zi<-lapply(c(1:15), function(x){
   bmest_zi<-list(
@@ -362,6 +472,10 @@ bmmodperage_zi<-lapply(c(1:15), function(x){
 }
 )
 
+bm10_modbyage<-purrr::transpose(bm_rep10mods)
+View(bm10_modbyage)
+
+
 #############################################
 
 #model checker
@@ -372,6 +486,10 @@ bmcheckperage_gau<-lapply(bmmodperage_gau ,function(x){modelchecker(x)})
 bmcheckperage_zi<-lapply(bmmodperage_zi, function(x){modelchecker(x)})
 
 
+bmcheckperage_10<-lapply(bm10_modbyage, function(x){modelchecker(x)})
+
+View(bmcheckperage_10[[1]])
+
 bmcheckgau_df<-do.call(rbind.data.frame, bmcheckperage_gau)
 bmcheckzi_df<-do.call(rbind.data.frame, bmcheckperage_zi)
 
@@ -380,6 +498,7 @@ bmcheckzi_df<-do.call(rbind.data.frame, bmcheckperage_zi)
 
 bmavgperage_gau<-lapply(bmmodperage_gau, function(x){model.avg(x)})
 bmavgperage_zi<-lapply(bmmodperage_zi, function(x){model.avg(x)})   #i think the zigamma performs better here. 
+
 
 # View(bmcheckgau_df)
 
@@ -430,6 +549,40 @@ bmselection_zi<-ggplot(bmestavgperage_zi_df, aes(x=age, y=Estimate))+
   geom_errorbar(aes(ymin = (Estimate-`Std. Error`), ymax=(Estimate+`Std. Error`)), alpha=0.3)+xlab('Age (years)') +theme_cowplot()
 
 bmselection_zi
+
+###############################
+bm10_avgperage<-lapply(bm10_modbyage, function(x){model.avg(x)})
+
+bm10avgperage<-lapply(bm10_avgperage, 
+                          function(x){modsum<-summary(x)
+                          one<-as.data.frame(as_tibble_row(modsum$coefmat.full["cond(BodyMass)",]))
+                          return(one)})
+
+
+bm10avgperagedf<-do.call(rbind.data.frame, bm10avgperage)
+bm10avgperagedf$age<-as.numeric(rownames(bm10avgperagedf))
+
+View(bmestavgperage_zi_df)
+
+# tarscoeffperagedf$ymin<-tarscoeffperagedf$Estimate-1.96*tarscoeffperagedf$`Std. Error`
+# tarscoeffperagedf$ymax<-tarscoeffperagedf$Estimate+1.96*tarscoeffperagedf$`Std. Error`
+
+bmselection_zi<-ggplot(bmestavgperage_zi_df, aes(x=age, y=Estimate))+
+  stat_smooth(method='lm')+geom_point()+
+  geom_errorbar(aes(ymin = (Estimate-`Std. Error`), ymax=(Estimate+`Std. Error`)), alpha=0.3)+xlab('Age (years)') +theme_cowplot()
+
+bmselection_zi
+
+
+bm10avgperagedf<-bm10avgperagedf%>%
+  mutate(pval_lab=case_when(`Pr(>|z|)`>0.05~'',
+                            `Pr(>|z|)`<0.05~'**'))
+
+bm10selection<-ggplot(bm10avgperagedf, aes(x=age, y=Estimate))+
+  stat_smooth(method='lm')+geom_point()+geom_text(aes(label=pval_lab), vjust=-10)+
+  geom_errorbar(aes(ymin = (Estimate-`Std. Error`), ymax=(Estimate+`Std. Error`)), alpha=0.3)+xlab('Age (years)') +theme_cowplot()
+
+bm10selection
 
 #############################################
 

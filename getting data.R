@@ -838,6 +838,8 @@ write.csv(pxfxnx_alltime, 'pxfxnx_all.csv')
 #####################################################
 #make leslie matrix 
 library(demogR)
+library(devtools)
+devtools::install_github('BruceKendall/mpmtools')
 library(mpmtools)
 
 all_bycohort<-read_rds('pxmxnx_bycohort.rds')
@@ -940,17 +942,18 @@ r<-log(lambda_all)
 
 pxfxnx_alltime<-as.data.frame(pxfxnx_alltime)
 
-survshadow<-pxfxnx_alltime%>%
+survshadow<-pxfxnx_alltime %>%
   mutate(cumsurv=cumprod(px), 
          ly=lead(cumsurv),
-         cumsurvery=ly*e^(-r*(x+1))) %>%
+         my=lead(mx),
+         cumsurvery=ly*my*e^(-r*(age+1))) %>%
   arrange(desc(age)) %>%
   filter(!(age %in%"19")) %>%
   mutate(selection=cumsum(cumsurvery)/px)%>%
   arrange(age)
 
 survplot<-ggplot(survshadow, aes(age, selection))+geom_point()+
-  geom_line()+ylab('Hamiltonian Strength of Selection')+xlab("Age")+theme_classic()
+  geom_line()+ylab('Hamiltonian Strength of Selection')+xlab("Age")+theme_classic(base_size = 16)
 
 
 survplot
@@ -960,18 +963,18 @@ survplot
 
 
 
-survshadow<-data.frame()
-for(i in 1:nrow(pxfxnx_alltime)){
-  # x<-seq(1:i+1)
-  age<-(i-1)
-  lx<-cumprod(pxfxnx_alltime$sx[1:i])
-  lx<-lx[-c(1)]
-  lx<-lx*e^(-lambda_all*age)
-  upper<-cumsum(that)
-  beta<-upper/pxfxnx_alltime$sx[i]
-  onerow<-c(age,beta)
-  survshadow<-rbind(survshadow, onerow)
-}
+# survshadow<-data.frame()
+# for(i in 1:nrow(pxfxnx_alltime)){
+#   # x<-seq(1:i+1)
+#   age<-(i-1)
+#   lx<-cumprod(pxfxnx_alltime$sx[1:i])
+#   lx<-lx[-c(1)]
+#   lx<-lx*e^(-lambda_all*age)
+#   upper<-cumsum(that)
+#   beta<-upper/pxfxnx_alltime$sx[i]
+#   onerow<-c(age,beta)
+#   survshadow<-rbind(survshadow, onerow)
+# }
 
 
 #######################
@@ -1267,3 +1270,18 @@ px_separate<-ggplot(mx_femmale, aes(x=age, y=px, colour=sex))+geom_point()+geom_
 mx_separate<-ggplot(mx_femmale, aes(x=age, y=mx, colour=sex))+geom_point()+geom_line()
 mx_separate
 px_separate
+#####################
+
+ageingaccuracy<-sqlQuery(swdb, "SELECT tblCatches.BirdID, tblCatches.CatchType, tblBirdID.BirthDate, tblOccasionIDs.OccasionDate, tblOccasionIDs.Island
+FROM tblOccasionIDs INNER JOIN (tblBirdID INNER JOIN tblCatches ON tblBirdID.BirdID = tblCatches.BirdID) ON tblOccasionIDs.OccasionID = tblCatches.OccasionID
+WHERE (((tblCatches.CatchType)='N') AND ((tblOccasionIDs.Island)='CN'));", stringsAsFactors=F)
+
+ageingaccuracy$BirthDate<-as.Date(ageingaccuracy$BirthDate,'%y-%m-%d')
+ageingaccuracy$OccasionDate<-as.Date(ageingaccuracy$OccasionDate, '%y-%m-%d')
+
+ageingaccuracy$age<-ageingaccuracy$OccasionDate-ageingaccuracy$BirthDate
+
+agescaught<-ageingaccuracy%>%
+  group_by(age)%>%
+  summarise(count=n())
+

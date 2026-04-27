@@ -126,6 +126,7 @@ telo_w$w1[is.na(telo_w$w1)]<-0
 # telo_w$lrs[is.na(telo_w$lrs)]<-0
 
 
+hist(telo_w$w1)
 
 #########################
 library(glmmTMB)
@@ -150,6 +151,9 @@ telobyage <- lapply(telo_byage, function(x) {
   x$w1_z<-scale(x$w1)
   return(x)
 })
+
+
+
 
 # teloage0<-telobyage[[1]]
 # 
@@ -208,7 +212,7 @@ telo_zigammaest$age<-as.numeric(rownames(telo_zigammaest))
 # 
 # telo_mods4<-lapply(telobyage, modelfunc4)  #modelling with LRS 
 
-
+summary(telo_mod2[[1]])
 t_coeff<-as.data.frame(do.call(rbind,telo_coeff))
 
 t_coeff$age<-c(0:12)
@@ -247,7 +251,7 @@ plot(t_coeff$age, t_coeff$Estimate)
 
 telo_mod$age_year<-as.factor(telo_mod$age_year)
 
-ggplot(telo_mod, aes(y = w, colour = age_year))+geom_histogram() 
+# ggplot(telo_mod, aes(y = w, colour = age_year))+geom_histogram() 
 
 source('modelchecker code.R')
 
@@ -255,6 +259,44 @@ telomod1check<-modelchecker(telo_coeff2)
 
 telomod2check<-modelchecker(telo_mod2)  #KS test results much better than gaussian, although AIC higher, but i think these models perform better. 
 
+##########
+
+#
+library(sandwich)
+library(lmtest)
+library(boot)
+View(telo_mod2)
+
+teloage0mod<-telo_mod2[[1]]
+
+testboot<-vcovHC(teloage0mod)
+confint(testboot)
+#gaddammit it dont work 
+
+teloage0df<-telobyage[[1]]
+
+nboot<-1000
+sum_fun <- function(fit) {
+  unlist(fixef(fit))
+}
+
+bres <- matrix(NA,
+               nrow=nboot,
+               ncol=length(sum_fun(teloage0mod)),
+               dimnames=list(rep=seq(nboot),
+                             coef=names(sum_fun(teloage0mod))))
+
+set.seed(1000)
+bootsize <- 351
+pb <- txtProgressBar(max = bootsize, style = 3)
+for (i in seq(nboot)) {
+  setTxtProgressBar(pb, i)
+  bdat <- teloage0df[sample(nrow(teloage0df), size=bootsize,replace=TRUE),]
+  bfit <- update(teloage0mod, data=bdat)  ## refit with new data
+  bres[i,] <- sum_fun(bfit)
+}
+
+View(bres)
 
 
 #########################################################
